@@ -6,8 +6,7 @@ PlugStudy est un projet d'équipe du bootcamp RodiumAi (équipe 5, J-PLUG), pour
 
 **MVP** : création de compte avec vérification par lien, connexion (e-mail, Google), onboarding, profil modifiable, puis
 ajout d'un cours que l'IA lit pour dégager les notions, les classer de la plus à la moins importante, et préparer la fiche,
-la séance de révision et le quiz. L'assistant (chatbot), le suivi et le planning sont construits ou prévus mais cachés
-(réglages dans `frontend/src/lib/features.ts`).
+la séance de révision et le quiz.
 
 ## Organisation
 
