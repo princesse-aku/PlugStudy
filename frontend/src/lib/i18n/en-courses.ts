@@ -151,4 +151,6 @@ export const EN_COURSES: Record<string, string> = {
   "Choisir un autre fichier": "Choose another file",
   "Réviser ce cours": "Study this course",
   "Lancer un quiz": "Start a quiz",
+  "Impossible de lire ce fichier. Enregistre-le sur ton téléphone, puis choisis-le de nouveau.":
+    "We couldn’t read this file. Save it on your phone, then choose it again.",
 };

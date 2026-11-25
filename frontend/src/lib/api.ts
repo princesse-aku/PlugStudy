@@ -35,8 +35,16 @@ function messageForStatus(status: number): string {
 export async function sendCourseFile(courseId: string, file: File, language: "fr" | "en" = "fr"): Promise<boolean> {
   const headers = await authHeaders();
   if (!headers) return false;
+  // Sur Android, un fichier choisi depuis Téléchargements, WhatsApp ou Drive n'est lu qu'au moment de l'envoi, et le navigateur
+  // l'abandonne parfois sans qu'aucune requête n'arrive au serveur. On le lit donc en mémoire d'abord, puis on envoie la copie.
+  let content: Blob;
+  try {
+    content = new Blob([await file.arrayBuffer()], { type: file.type || "application/octet-stream" });
+  } catch {
+    throw new UserFacingError("Impossible de lire ce fichier. Enregistre-le sur ton téléphone, puis choisis-le de nouveau.");
+  }
   const body = new FormData();
-  body.append("file", file);
+  body.append("file", content, file.name);
   body.append("language", language); // résumé, notions et quiz sont écrits dans cette langue
   // L'hébergement gratuit endort le serveur : on le réveille d'abord (sans garder le fichier en attente),
   // puis on retente une fois si le réseau coupe pendant l'envoi.
