@@ -24,9 +24,9 @@ services:
       - key: RODIUMAI_API_KEY
         sync: false
       - key: RODIUM_MODEL_STRONG
-        value: google/gemini-3.8-flash
+        value: anthropic/claude-haiku-5-5
       - key: RODIUM_MODEL_FAST
-        value: google/gemini-3.8-flash
+        value: anthropic/claude-haiku-5-5
       - key: RODIUM_EMBEDDINGS_ENABLED
         value: "false"
       - key: ALLOWED_ORIGINS

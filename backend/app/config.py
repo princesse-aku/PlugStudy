@@ -15,13 +15,13 @@ class Settings(BaseSettings):
     # API RodiumAI (compatible OpenAI : /chat/completions et /embeddings).
     rodiumai_base_url: str = ""
     rodiumai_api_key: str = ""
-    rodium_model_strong: str = "google/gemini-3.8-flash"  # extraction des notions, génération du quiz
-    rodium_model_fast: str = "google/gemini-3.8-flash"  # résumés et réponses de l'assistant
+    rodium_model_strong: str = "anthropic/claude-haiku-5-5"  # extraction des notions, génération du quiz
+    rodium_model_fast: str = "anthropic/claude-haiku-5-5"  # résumés et réponses de l'assistant
     rodium_model_embedding: str = "text-embedding-3-small"
     # Les embeddings ne servent qu'à l'assistant (caché dans le MVP) : désactivés pour gagner du temps et de l'argent.
     rodium_embeddings_enabled: bool = False
     rodium_timeout_seconds: float = 120.0
-    # google/gemini-3.8-flash est un modèle « à réflexion » : les jetons de réflexion comptent dans la limite de sortie.
+    # anthropic/claude-haiku-5-5 est un modèle « à réflexion » : les jetons de réflexion comptent dans la limite de sortie.
     # Sans marge, il s'arrête avant d'écrire sa réponse. Cette marge s'ajoute à la limite demandée par chaque appel.
     rodium_reasoning_budget: int = 6000
     # « Mode JSON » de l'API : désactivé, car la passerelle renvoie une réponse vide avec ce modèle. Le prompt demande

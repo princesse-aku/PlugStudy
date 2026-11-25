@@ -87,7 +87,7 @@ class TestPipeline:
         from app.config import Settings
 
         assert Settings(_env_file=None).rodium_embeddings_enabled is False
-        assert Settings(_env_file=None).rodium_model_strong == "google/gemini-3.8-flash"
+        assert Settings(_env_file=None).rodium_model_strong == "anthropic/claude-haiku-5-5"
         calls = []
 
         class Spy(FakeAI):

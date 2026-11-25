@@ -82,7 +82,7 @@ def test_envoie_modele_et_cle_sans_mode_json_par_defaut(server):
     first, second = Handler.requests
     assert first["path"] == "/v1/chat/completions" and first["auth"] == "Bearer cle-test"
     # Le MVP utilise un seul modèle pour toutes les tâches.
-    assert first["body"]["model"] == "google/gemini-3.8-flash" and second["body"]["model"] == "google/gemini-3.8-flash"
+    assert first["body"]["model"] == "anthropic/claude-haiku-5-5" and second["body"]["model"] == "anthropic/claude-haiku-5-5"
     assert "response_format" not in first["body"]  # la passerelle le gère mal avec ce modèle
     assert [m["role"] for m in first["body"]["messages"]] == ["system", "user"]
 

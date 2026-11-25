@@ -34,7 +34,7 @@ elles se saisissent dans les tableaux de bord de Render et de Vercel.
 | `RODIUMAI_API_KEY` | la clé RodiumAI (secret) |
 | `ALLOWED_ORIGINS` | l'adresse Vercel (étape 3 ; au début, `http://localhost:3000`) |
 
-- Les autres valeurs (modèle `google/gemini-3.8-flash`, embeddings désactivés…) sont déjà dans `render.yaml`.
+- Les autres valeurs (modèle `anthropic/claude-haiku-5-5`, embeddings désactivés…) sont déjà dans `render.yaml`.
 - Vérifier : `https://….onrender.com/health` doit répondre `{"status":"ok"}`.
 
 ## 2. Frontend sur Vercel
