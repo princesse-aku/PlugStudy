@@ -3,6 +3,18 @@
 Le **backend** (FastAPI) va sur **Render**, le **frontend** (Next.js) sur **Vercel**. Les clés ne sont jamais dans Git :
 elles se saisissent dans les tableaux de bord de Render et de Vercel.
 
+## En ligne (déployé le 25 novembre 2026)
+
+| | Adresse |
+| --- | --- |
+| Site (Vercel, projet `plug-study`) | https://plug-study.vercel.app |
+| API (Render, service `plugstudy-api`, Francfurt, plan gratuit) | https://plugstudy-api.onrender.com (`/health`) |
+
+- Vercel redéploie le site à chaque `git push` sur `main`.
+- Render ne redéploie pas tout seul (dépôt public non connecté à un compte GitHub) : *Manual Deploy* dans le tableau de bord après un changement du backend.
+- `ALLOWED_ORIGINS` (Render) = `https://plug-study.vercel.app,http://localhost:3000`. Domaine `plug-study.vercel.app` ajouté dans Firebase > Authentication > Domaines autorisés.
+- Variables du frontend (Vercel > Settings > Environment Variables) : les 6 `NEXT_PUBLIC_FIREBASE_…` et `NEXT_PUBLIC_API_URL`.
+
 ## Ordre à suivre
 
 1. **Render** : créer le backend, récupérer son adresse (`https://….onrender.com`).
