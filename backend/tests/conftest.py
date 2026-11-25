@@ -52,9 +52,11 @@ class FakeAI:
         self.fail = fail
         self.no_embeddings = no_embeddings
         self.calls: list[tuple[str, str]] = []
+        self.prompts: list[str] = []  # les consignes système complètes, pour vérifier la langue demandée
 
     def complete_json(self, *, role: str, system: str, user: str, max_tokens: int = 2000) -> dict[str, Any]:
         self.calls.append((role, system[:30]))
+        self.prompts.append(system)
         if self.fail:
             raise AIError("panne")
         if system.startswith("Tu résumes") or system.startswith("Tu fusionnes"):

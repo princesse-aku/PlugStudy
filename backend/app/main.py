@@ -13,7 +13,7 @@ import re
 import time
 from functools import lru_cache
 
-from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, UploadFile, status
+from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, HTTPException, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -76,6 +76,7 @@ async def process(
     course_id: str,
     background: BackgroundTasks,
     file: UploadFile = File(...),
+    language: str = Form("fr"),
     uid: str = Depends(current_uid),
     store: Store = Depends(get_store),
     ai: AIClient = Depends(get_ai),
@@ -101,7 +102,7 @@ async def process(
         raise HTTPException(413, f"Le fichier dépasse {settings.max_upload_mb} Mo.")
 
     store.set(course_path(uid, course_id), {"processingStartedAt": time.time()}, merge=True)
-    background.add_task(process_course, store, ai, settings, uid, course_id, filename, data)
+    background.add_task(process_course, store, ai, settings, uid, course_id, filename, data, "en" if language == "en" else "fr")
     return {"status": "processing"}
 
 
@@ -131,8 +132,9 @@ def assistant(
         if not passages:
             passages = top_by_words(question, chunks)
         if not passages:
-            return AssistantReply(text=not_found_message(name))
-        reply = answer_question(ai, question, passages, name)
+            return AssistantReply(text=not_found_message(name, "en" if course.get("language") == "en" else "fr"))
+        language = "en" if course.get("language") == "en" else "fr"
+        reply = answer_question(ai, question, passages, name, language)
     except AIError:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "L'assistant est momentanément indisponible.") from None
     return AssistantReply(**reply)

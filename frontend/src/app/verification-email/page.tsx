@@ -6,6 +6,7 @@ import { Button } from "@/components/Button";
 import { DemoBanner } from "@/components/DemoBanner";
 import { Screen } from "@/components/Screen";
 import { destinationFor, useAuth } from "@/lib/auth-context";
+import { useI18n } from "@/lib/i18n";
 import { maskEmail } from "@/lib/email";
 
 const DELAI_RENVOI = 60;
@@ -17,6 +18,7 @@ function formatDelay(seconds: number) {
 /** Écran 4 · Vérifie ta boîte mail : Firebase envoie un lien (pas un code). */
 export default function VerificationEmailPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const { ready, user, profile, resendVerification, refreshUser, discardAccount } = useAuth();
   const [remaining, setRemaining] = useState(DELAI_RENVOI);
   const [busy, setBusy] = useState<"check" | "resend" | "change" | null>(null);
@@ -80,29 +82,29 @@ export default function VerificationEmailPage() {
     <Screen tone="white">
       <DemoBanner />
       <div className="flex flex-1 flex-col gap-4 px-6 pb-6 pt-16">
-        <h1 className="font-display text-[26px] font-bold leading-tight">Vérifie ta boîte mail</h1>
+        <h1 className="font-display text-[26px] font-bold leading-tight">{t("Vérifie ta boîte mail")}</h1>
         <p className="text-[15px] leading-relaxed text-ink">
-          Nous avons envoyé un lien de vérification à <strong className="font-semibold">{maskEmail(user.email)}</strong>.
-          Ouvre-le pour confirmer ton adresse.
+          {t("Nous avons envoyé un lien de vérification à")}{" "}
+          <strong className="font-semibold">{maskEmail(user.email)}</strong>. {t("Ouvre-le pour confirmer ton adresse.")}
         </p>
         <p className="text-sm leading-relaxed text-muted">
-          Tu ne vois rien ? Regarde dans tes courriers indésirables (spam).
+          {t("Tu ne vois rien ? Regarde dans tes courriers indésirables (spam).")}
         </p>
 
         {error ? (
           <p role="alert" className="rounded-xl bg-danger-bg px-4 py-3 text-sm text-danger">
-            {error}
+            {t(error)}
           </p>
         ) : null}
         {info ? (
           <p role="status" className="rounded-xl bg-pale px-4 py-3 text-sm text-pale2">
-            {info}
+            {t(info)}
           </p>
         ) : null}
 
         <div className="mt-2 flex flex-col gap-3">
           <Button type="button" onClick={() => void onChecked()} disabled={busy !== null} aria-busy={busy === "check"}>
-            {busy === "check" ? "Vérification…" : "J’ai ouvert le lien"}
+            {busy === "check" ? t("Vérification…") : t("J’ai ouvert le lien")}
           </Button>
           <Button
             type="button"
@@ -111,7 +113,7 @@ export default function VerificationEmailPage() {
             disabled={busy !== null || remaining > 0}
             aria-busy={busy === "resend"}
           >
-            {remaining > 0 ? `Renvoyer le lien dans ${formatDelay(remaining)}` : "Renvoyer le lien"}
+            {remaining > 0 ? t("Renvoyer le lien dans {delay}", { delay: formatDelay(remaining) }) : t("Renvoyer le lien")}
           </Button>
           <button
             type="button"
@@ -119,7 +121,7 @@ export default function VerificationEmailPage() {
             disabled={busy !== null}
             className="flex min-h-11 items-center justify-center text-sm font-semibold text-deep disabled:opacity-60"
           >
-            Changer d’adresse e-mail
+            {t("Changer d’adresse e-mail")}
           </button>
         </div>
       </div>

@@ -18,11 +18,11 @@ import { Screen } from "@/components/Screen";
 import { useRequireStudent } from "@/lib/auth-context";
 import { sendCourseFile } from "@/lib/api";
 import { backend } from "@/lib/backend";
+import { useI18n } from "@/lib/i18n";
 import { extensionOf, nameFromFile } from "@/lib/courses";
 import { fileSizeLabel } from "@/lib/time";
 import { CATEGORIES, COURSE_EXTENSIONS, type Category, type Profile } from "@/lib/types";
 
-const NOM_HINT = "Nom proposé d’après le fichier. Tu peux le changer.";
 const FORMAT_ERROR = "Ce format n’est pas pris en charge. Choisis un PDF, DOCX, PPT ou TXT.";
 
 /** Catégorie proposée d'après la filière de l'étudiant (la détection par l'IA viendra avec le backend). */
@@ -37,15 +37,16 @@ function guessCategory(profile: Profile | null): Category {
 }
 
 function AiPrepares() {
+  const { t } = useI18n();
   const items = [
-    { label: "Fiche résumée", Icon: FileIcon },
-    { label: "Quiz", Icon: CircleCheckIcon },
-    { label: "Plan de révision", Icon: CalendarIcon },
+    { label: t("Fiche résumée"), Icon: FileIcon },
+    { label: t("Quiz"), Icon: CircleCheckIcon },
+    { label: t("Plan de révision"), Icon: CalendarIcon },
   ];
   return (
     <section aria-labelledby="ia" className="flex flex-col gap-3 rounded-2xl border border-line bg-card px-4 py-3.5">
       <h2 id="ia" className="text-[13px] font-bold uppercase tracking-[0.08em] text-muted">
-        Ce que l’IA prépare
+        {t("Ce que l’IA prépare")}
       </h2>
       <ul className="grid grid-cols-3 gap-2">
         {items.map(({ label, Icon }) => (
@@ -64,6 +65,7 @@ function AiPrepares() {
 /** Écrans 11 · Ajouter un cours (dépôt) et 12 · fichier choisi (nom, description, catégorie). */
 export default function AjouterCoursPage() {
   const router = useRouter();
+  const { t, lang } = useI18n();
   const { ok, user, profile } = useRequireStudent();
   const input = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -76,6 +78,7 @@ export default function AjouterCoursPage() {
   const [saving, setSaving] = useState(false);
 
   if (!ok || !user) return <Screen />;
+  const nomHint = t("Nom proposé d’après le fichier. Tu peux le changer.");
 
   function choose(picked: File | undefined) {
     if (!picked) return;
@@ -110,7 +113,7 @@ export default function AjouterCoursPage() {
       });
       // Le backend lit le fichier et prépare fiche, notions et quiz ; sans backend branché, le cours reste en préparation.
       try {
-        await sendCourseFile(courseId, file);
+        await sendCourseFile(courseId, file, lang);
       } catch {
         await backend.setDocument(["users", user.uid, "courses", courseId], { status: "error", errorReason: "upload" }, true);
         router.push(`/cours/${courseId}`);
@@ -126,14 +129,14 @@ export default function AjouterCoursPage() {
   const back = file ? (
     <button
       type="button"
-      aria-label="Retour"
+      aria-label={t("Retour")}
       onClick={() => setFile(null)}
       className="flex h-11 w-11 items-center justify-center"
     >
       <ChevronLeftIcon />
     </button>
   ) : (
-    <Link href="/cours" aria-label="Retour" className="flex h-11 w-11 items-center justify-center">
+    <Link href="/cours" aria-label={t("Retour")} className="flex h-11 w-11 items-center justify-center">
       <ChevronLeftIcon />
     </Link>
   );
@@ -145,9 +148,9 @@ export default function AjouterCoursPage() {
         <header className="flex items-center gap-2 px-2 pb-2 pt-3">
           {back}
           <div className="flex flex-col">
-            <h1 className="font-display text-lg font-bold">Ajouter un cours</h1>
+            <h1 className="font-display text-lg font-bold">{t("Ajouter un cours")}</h1>
             <p className="text-[13px] text-muted">
-              {file ? "Vérifie, puis crée ton cours." : "Dépose ton fichier, PlugStudy prépare le reste."}
+              {file ? t("Vérifie, puis crée ton cours.") : t("Dépose ton fichier, PlugStudy prépare le reste.")}
             </p>
           </div>
         </header>
@@ -175,33 +178,33 @@ export default function AjouterCoursPage() {
                 </span>
                 <div className="flex min-w-0 flex-1 flex-col">
                   <span className="break-words text-base font-semibold">{file.name}</span>
-                  <span className="text-[13px] text-muted">{fileSizeLabel(file.size)}</span>
+                  <span className="text-[13px] text-muted">{fileSizeLabel(file.size, lang)}</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => input.current?.click()}
                   className="flex min-h-11 items-center px-1 text-sm font-semibold text-deep"
                 >
-                  Changer
+                  {t("Changer")}
                 </button>
               </div>
 
-              <Field id="nom" label="Nom du cours" hint={NOM_HINT}>
+              <Field id="nom" label={t("Nom du cours")} hint={nomHint}>
                 <TextInput
                   id="nom"
                   autoComplete="off"
-                  placeholder="Nom du cours"
+                  placeholder={t("Nom du cours")}
                   value={name}
                   onChange={(event) => setName(event.target.value)}
-                  aria-describedby={describedBy("nom", NOM_HINT)}
+                  aria-describedby={describedBy("nom", nomHint)}
                 />
               </Field>
 
-              <Field id="desc" label="Description" optional>
+              <Field id="desc" label={t("Description")} optional>
                 <TextInput
                   id="desc"
                   autoComplete="off"
-                  placeholder="Une ligne pour te rappeler de quoi il s’agit"
+                  placeholder={t("Une ligne pour te rappeler de quoi il s’agit")}
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
                 />
@@ -209,12 +212,12 @@ export default function AjouterCoursPage() {
 
               <div className="flex flex-col gap-2">
                 <label htmlFor="categorie" className="text-sm font-semibold">
-                  Catégorie
+                  {t("Catégorie")}
                 </label>
                 <Select id="categorie" value={category} onChange={(event) => setCategory(event.target.value as Category)}>
                   {CATEGORIES.map((item) => (
                     <option key={item} value={item}>
-                      {item}
+                      {t(item)}
                     </option>
                   ))}
                 </Select>
@@ -222,7 +225,7 @@ export default function AjouterCoursPage() {
                   <span className="text-pale2">
                     <CheckIcon size={16} />
                   </span>
-                  Choisie d’après ta filière. Tu peux la changer.
+                  {t("Choisie d’après ta filière. Tu peux la changer.")}
                 </p>
               </div>
             </>
@@ -241,16 +244,16 @@ export default function AjouterCoursPage() {
               <span className="text-pale2">
                 <UploadIcon size={32} />
               </span>
-              <h2 className="font-display text-lg font-bold">Dépose ton fichier de cours</h2>
-              <p className="text-sm leading-relaxed text-muted">PDF, DOCX, PPT ou TXT</p>
+              <h2 className="font-display text-lg font-bold">{t("Dépose ton fichier de cours")}</h2>
+              <p className="text-sm leading-relaxed text-muted">{t("PDF, DOCX, PPT ou TXT")}</p>
               <div className="mt-1.5 self-stretch">
                 <Button type="button" variant="secondary" onClick={() => input.current?.click()}>
-                  Ajouter un fichier
+                  {t("Ajouter un fichier")}
                 </Button>
               </div>
               {fileError ? (
                 <p role="alert" className="text-[13px] leading-snug text-danger">
-                  {fileError}
+                  {t(fileError)}
                 </p>
               ) : null}
             </div>
@@ -260,14 +263,14 @@ export default function AjouterCoursPage() {
 
           {formError ? (
             <p role="alert" className="rounded-xl bg-danger-bg px-4 py-3 text-sm text-danger">
-              {formError}
+              {t(formError)}
             </p>
           ) : null}
         </div>
 
         <div className="px-5 pb-6 pt-2">
           <Button type="submit" disabled={!file || !name.trim() || saving} aria-busy={saving}>
-            {saving ? "Création…" : "Créer le cours"}
+            {saving ? t("Création…") : t("Créer le cours")}
           </Button>
         </div>
       </form>

@@ -8,6 +8,7 @@ import { DemoBanner } from "@/components/DemoBanner";
 import { CheckIcon, CrossIcon } from "@/components/Icons";
 import { BackHeader, Notice, SourceChip } from "@/components/Revision";
 import { Screen } from "@/components/Screen";
+import { useI18n } from "@/lib/i18n";
 import { loadQuestions, saveQuizAttempt, useNotions } from "@/lib/data";
 import { pickQuizQuestions } from "@/lib/revision";
 import { useCourseScreen } from "@/lib/use-courses";
@@ -18,6 +19,7 @@ const LETTERS = ["A", "B", "C", "D", "E", "F"];
 /** Écran 20 · Quiz de fin de séance : une question à la fois, avec « Pourquoi ce n'est pas A » et la source. */
 export default function QuizPage() {
   const { id } = useParams<{ id: string }>();
+  const { t } = useI18n();
   const router = useRouter();
   const state = useCourseScreen(id);
   const uid = state.phase === "ready" ? state.user.uid : undefined;
@@ -44,8 +46,8 @@ export default function QuizPage() {
   if (state.phase === "missing") {
     return (
       <Screen>
-        <BackHeader href="/cours" title="Cours introuvable" />
-        <Notice>Ce cours n’existe pas ou a été supprimé.</Notice>
+        <BackHeader href="/cours" title={t("Cours introuvable")} />
+        <Notice>{t("Ce cours n’existe pas ou a été supprimé.")}</Notice>
       </Screen>
     );
   }
@@ -57,8 +59,8 @@ export default function QuizPage() {
   if (questions.length === 0) {
     return (
       <Screen>
-        <BackHeader href={back} title="Quiz de fin de séance" />
-        <Notice>Le quiz de ce cours n’est pas encore prêt.</Notice>
+        <BackHeader href={back} title={t("Quiz de fin de séance")} />
+        <Notice>{t("Le quiz de ce cours n’est pas encore prêt.")}</Notice>
       </Screen>
     );
   }
@@ -95,7 +97,7 @@ export default function QuizPage() {
       const attemptId = await saveQuizAttempt(user, course, notions, all);
       router.push(`/cours/${id}/resultat?tentative=${attemptId}`);
     } catch {
-      setError("Impossible d’enregistrer ton résultat. Vérifie ta connexion et réessaie.");
+      setError(t("Impossible d’enregistrer ton résultat. Vérifie ta connexion et réessaie."));
       setSaving(false);
     }
   }
@@ -103,9 +105,9 @@ export default function QuizPage() {
   return (
     <Screen>
       <DemoBanner />
-      <BackHeader href={back} title="Quiz de fin de séance" subtitle={`Question ${index + 1} sur ${questions.length}`} />
+      <BackHeader href={back} title={t("Quiz de fin de séance")} subtitle={t("Question {n} sur {total}", { n: index + 1, total: questions.length })} />
       <div className="px-5 pb-2">
-        <ProgressBar value={Math.round(((index + 1) / questions.length) * 100)} label="Avancement du quiz" />
+        <ProgressBar value={Math.round(((index + 1) / questions.length) * 100)} label={t("Avancement du quiz")} />
       </div>
 
       <div className="flex flex-1 flex-col gap-2.5 px-5 pt-2">
@@ -120,6 +122,13 @@ export default function QuizPage() {
               : isWrong
                 ? "border-2 border-danger bg-danger-bg"
                 : "border border-line bg-card";
+            const marker = isRight ? (
+              <CheckIcon size={18} />
+            ) : isWrong ? (
+              <CrossIcon size={18} />
+            ) : (
+              LETTERS[choiceIndex]
+            );
             return (
               <li key={choice}>
                 <button
@@ -139,12 +148,12 @@ export default function QuizPage() {
                           : "box-border border-2 border-field text-muted"
                     }`}
                   >
-                    {isRight ? <CheckIcon size={18} /> : isWrong ? <CrossIcon size={18} /> : LETTERS[choiceIndex]}
+                    {marker}
                   </span>
                   <span className="flex flex-col gap-0.5">
                     <span className="text-[15px] leading-snug">{choice}</span>
-                    {isWrong ? <span className="text-[13px] font-bold text-danger">Ta réponse</span> : null}
-                    {isRight ? <span className="text-[13px] font-bold text-pale2">Bonne réponse</span> : null}
+                    {isWrong ? <span className="text-[13px] font-bold text-danger">{t("Ta réponse")}</span> : null}
+                    {isRight ? <span className="text-[13px] font-bold text-pale2">{t("Bonne réponse")}</span> : null}
                   </span>
                 </button>
               </li>
@@ -155,7 +164,7 @@ export default function QuizPage() {
         {answered ? (
           <section role="status" className="mt-1 flex flex-col gap-2 rounded-[14px] border border-line bg-card p-3.5">
             <h3 className="text-[15px] font-bold">
-              {wrong ? `Pourquoi ce n’est pas ${LETTERS[picked ?? 0]}` : "Pourquoi c’est juste"}
+              {wrong ? t("Pourquoi ce n’est pas {lettre}", { lettre: LETTERS[picked ?? 0] }) : t("Pourquoi c’est juste")}
             </h3>
             <p className="text-sm leading-relaxed">{question.explanation}</p>
             <div>
@@ -173,7 +182,7 @@ export default function QuizPage() {
 
       <div className="px-5 pb-6 pt-2">
         <Button type="button" disabled={!answered || saving} aria-busy={saving} onClick={() => void next()}>
-          {!answered ? "Choisis une réponse" : saving ? "Enregistrement…" : last ? "Voir mon résultat" : "Question suivante"}
+          {!answered ? t("Choisis une réponse") : saving ? t("Enregistrement…") : last ? t("Voir mon résultat") : t("Question suivante")}
         </Button>
       </div>
     </Screen>

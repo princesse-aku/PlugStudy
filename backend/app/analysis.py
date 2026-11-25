@@ -213,8 +213,14 @@ def page_text(doc: Document, number: int) -> str:
     return next((page.text for page in doc.pages if page.number == number), "")
 
 
-def source_label(course_name: str, doc: Document, infos: dict[int, PageInfo], page: int) -> str:
-    """« Algorithmique, chap. 2, p. 14 » (ou « diapo 14 », « partie 3 » selon le format)."""
+_PLACE_EN = {"p.": "p.", "diapo": "slide", "partie": "part"}
+
+
+def source_label(course_name: str, doc: Document, infos: dict[int, PageInfo], page: int, language: str = "fr") -> str:
+    """« Algorithmique, chap. 2, p. 14 » (en anglais « Algorithmique, ch. 2, p. 14 » ; « diapo », « partie » selon le format)."""
+    english = language == "en"
     chapter = infos[page].chapter if page in infos else None
-    place = f"{doc.page_label} {page}" if doc.page_label != "p." else f"p. {page}"
-    return f"{course_name}, chap. {chapter}, {place}" if chapter else f"{course_name}, {place}"
+    label = _PLACE_EN.get(doc.page_label, doc.page_label) if english else doc.page_label
+    place = f"p. {page}" if label == "p." else f"{label} {page}"
+    chapter_word = "ch." if english else "chap."
+    return f"{course_name}, {chapter_word} {chapter}, {place}" if chapter else f"{course_name}, {place}"

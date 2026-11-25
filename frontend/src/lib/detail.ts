@@ -1,5 +1,6 @@
 import { isDone } from "@/lib/courses";
 import { rankNotions, scorePercent } from "@/lib/revision";
+import { translate, type Lang } from "@/lib/i18n/translate";
 import { shortDate } from "@/lib/time";
 import type { Attempt, Course, Message, Notion } from "@/lib/types";
 
@@ -16,11 +17,13 @@ export function prepSteps(course: Pick<Course, "prepStep">): { label: string; st
 }
 
 /** Sous-titre de l'en-tête : « Examen le 12 déc. · En cours » (ou « Ajouté à l'instant » pendant la préparation). */
-export function courseSubtitle(course: Course, addedAgo: string): string {
-  if (course.status === "preparing") return `Ajouté ${addedAgo}`;
-  if (course.status === "error") return "Préparation impossible";
-  const exam = course.examDate ? `Examen le ${shortDate(course.examDate)}` : "Pas de date d’examen";
-  return `${exam} · ${isDone(course) ? "Terminé" : "En cours"}`;
+export function courseSubtitle(course: Course, addedAgo: string, lang: Lang = "fr"): string {
+  if (course.status === "preparing") return translate("Ajouté {when}", lang, { when: addedAgo });
+  if (course.status === "error") return translate("Préparation impossible", lang);
+  const exam = course.examDate
+    ? translate("Examen le {date}", lang, { date: shortDate(course.examDate, lang) })
+    : translate("Pas de date d’examen", lang);
+  return `${exam} · ${isDone(course) ? translate("Terminé", lang) : translate("En cours", lang)}`;
 }
 
 /** Moyenne des quiz du cours, en pourcentage (null sans quiz). */
@@ -40,12 +43,12 @@ export function notionsToStrengthen(notions: Notion[], attempts: Attempt[], limi
 }
 
 /** Trois questions pour démarrer, tirées des notions les plus importantes. */
-export function starterQuestions(notions: Notion[]): string[] {
+export function starterQuestions(notions: Notion[], lang: Lang = "fr"): string[] {
   const top = rankNotions(notions).slice(0, 3);
   const questions: string[] = [];
-  if (top[0]) questions.push(`C’est quoi « ${top[0].title} » ?`);
-  if (top[1]) questions.push(`Explique-moi « ${top[1].title} »`);
-  if (top[2]) questions.push(`Fais-moi un quiz sur « ${top[2].title} »`);
+  if (top[0]) questions.push(translate("C’est quoi « {title} » ?", lang, { title: top[0].title }));
+  if (top[1]) questions.push(translate("Explique-moi « {title} »", lang, { title: top[1].title }));
+  if (top[2]) questions.push(translate("Fais-moi un quiz sur « {title} »", lang, { title: top[2].title }));
   return questions;
 }
 
@@ -62,7 +65,7 @@ export function recentConversations(messages: Message[], limit = 2): { text: str
   return result;
 }
 
-/** Message d'une préparation qui a échoué (écran « Erreur d'import ») : la raison et quoi faire. */
+/** Message d'une préparation qui a échoué (écran « Erreur d'import ») : la raison et quoi faire. Textes français : l'écran les traduit avec t(). */
 export function errorMessage(reason: Course["errorReason"]): { title: string; text: string } {
   switch (reason) {
     case "unreadable":

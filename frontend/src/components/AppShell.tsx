@@ -7,6 +7,7 @@ import { BarsIcon, BookIcon, CalendarIcon, HomeIcon, PlusIcon, UserIcon } from "
 import { Screen } from "@/components/Screen";
 import { useRequireStudent } from "@/lib/auth-context";
 import { features } from "@/lib/features";
+import { useI18n } from "@/lib/i18n";
 
 export type NavItem = "accueil" | "cours" | "planning" | "suivi" | "profil";
 
@@ -23,8 +24,9 @@ const ITEMS = ALL_ITEMS.filter((item) => (item.id === "planning" ? features.plan
 
 /** Barre du bas : Accueil, Cours, Profil (et Planning, Suivi quand ils sont rallumés). */
 export function BottomNav({ active }: { active: NavItem }) {
+  const { t } = useI18n();
   return (
-    <nav aria-label="Navigation principale" className="flex border-t border-line bg-card px-3 pb-2.5 pt-1.5">
+    <nav aria-label={t("Navigation principale")} className="flex border-t border-line bg-card px-3 pb-2.5 pt-1.5">
       {ITEMS.map(({ id, label, href, Icon }) => {
         const on = id === active;
         return (
@@ -36,7 +38,7 @@ export function BottomNav({ active }: { active: NavItem }) {
           >
             <span className={`h-[3px] w-7 rounded-sm ${on ? "bg-accent" : ""}`} aria-hidden="true" />
             <Icon />
-            <span className={`text-xs ${on ? "font-bold" : "font-medium"}`}>{label}</span>
+            <span className={`text-xs ${on ? "font-bold" : "font-medium"}`}>{t(label)}</span>
           </Link>
         );
       })}
@@ -59,6 +61,7 @@ export function AppShell({
   children: ReactNode;
 }) {
   const { ok } = useRequireStudent();
+  const { t } = useI18n();
   if (!ok) return <Screen app />;
 
   return (
@@ -69,13 +72,13 @@ export function AppShell({
         <div className="pointer-events-none absolute inset-x-0 bottom-[88px] flex justify-center">
           <Link
             href="/cours/ajouter"
-            aria-label={fab === "round" ? "Ajouter un cours" : undefined}
+            aria-label={fab === "round" ? t("Ajouter un cours") : undefined}
             className={`pointer-events-auto flex items-center justify-center bg-accent text-on-accent shadow-lg hover:bg-deep ${
               fab === "round" ? "h-[60px] w-[60px] rounded-full" : "min-h-14 gap-2 rounded-full px-6 text-base font-bold"
             }`}
           >
             <PlusIcon size={fab === "round" ? 30 : 22} />
-            {fab === "pill" ? "Ajouter un cours" : null}
+            {fab === "pill" ? t("Ajouter un cours") : null}
           </Link>
         </div>
       ) : null}

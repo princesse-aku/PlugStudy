@@ -6,12 +6,14 @@ import { Button, ButtonLink } from "@/components/Button";
 import { CheckIcon } from "@/components/Icons";
 import { Screen } from "@/components/Screen";
 import { useAuth } from "@/lib/auth-context";
+import { useI18n } from "@/lib/i18n";
 import { features } from "@/lib/features";
 import { prepareTypicalCourses } from "@/lib/typical-courses";
 
 type StepState = "done" | "run" | "todo";
 
 function Step({ state, children }: { state: StepState; children: React.ReactNode }) {
+  const { t } = useI18n();
   const icon =
     state === "done" ? (
       <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent text-on-accent">
@@ -31,7 +33,7 @@ function Step({ state, children }: { state: StepState; children: React.ReactNode
     >
       {icon}
       <span>{children}</span>
-      <span className="sr-only">{state === "done" ? " (terminé)" : state === "run" ? " (en cours)" : " (à venir)"}</span>
+      <span className="sr-only">{state === "done" ? ` ${t("(terminé)")}` : state === "run" ? ` ${t("(en cours)")}` : ` ${t("(à venir)")}`}</span>
     </li>
   );
 }
@@ -41,6 +43,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 /** Écran 8 · Préparation de l'espace : profil créé, cours types, tableau de bord. */
 export default function PreparationPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const { ready, user, profile } = useAuth();
   const started = useRef(false);
   // 0 = préparation des cours types, 1 = tableau de bord, 2 = terminé
@@ -78,14 +81,14 @@ export default function PreparationPage() {
   return (
     <Screen>
       <div className="flex flex-1 flex-col gap-5 px-6 pt-16">
-        <h1 className="font-display text-[28px] font-bold leading-tight">Ton espace se prépare</h1>
+        <h1 className="font-display text-[28px] font-bold leading-tight">{t("Ton espace se prépare")}</h1>
         <p className="text-[15px] text-muted">
-          {profile.niveau} · {profile.filiere} · {profile.universite}
+          {t(profile.niveau)} · {profile.filiere} · {profile.universite}
         </p>
 
         <div
           role="progressbar"
-          aria-label="Préparation de ton espace"
+          aria-label={t("Préparation de ton espace")}
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={progress}
@@ -95,26 +98,28 @@ export default function PreparationPage() {
         </div>
 
         <ol aria-live="polite" className="flex flex-col gap-3.5 rounded-2xl border border-line bg-card p-4">
-          <Step state="done">Profil créé</Step>
+          <Step state="done">{t("Profil créé")}</Step>
           <Step state={phase === 0 ? "run" : "done"}>
-            {features.typicalCourses ? `Préparation des cours types : ${profile.filiere}, ${profile.niveau}` : "Préparation de ton espace"}
+            {features.typicalCourses
+              ? t("Préparation des cours types : {filiere}, {niveau}", { filiere: profile.filiere, niveau: t(profile.niveau) })
+              : t("Préparation de ton espace")}
           </Step>
-          <Step state={phase === 0 ? "todo" : phase === 1 ? "run" : "done"}>Ton tableau de bord</Step>
+          <Step state={phase === 0 ? "todo" : phase === 1 ? "run" : "done"}>{t("Ton tableau de bord")}</Step>
         </ol>
 
         <p className="rounded-[14px] bg-pale px-4 py-3.5 text-sm leading-relaxed text-pale2">
           {features.typicalCourses
-            ? "Les cours types sont une base de départ. Tu peux déposer tes propres cours à tout moment."
-            : "Ton espace est vide pour l’instant : dépose ton premier cours et l’IA le lira pour toi."}
+            ? t("Les cours types sont une base de départ. Tu peux déposer tes propres cours à tout moment.")
+            : t("Ton espace est vide pour l’instant : dépose ton premier cours et l’IA le lira pour toi.")}
         </p>
       </div>
 
       <div className="px-6 pb-6 pt-2">
         {phase === 2 ? (
-          <ButtonLink href="/accueil">Aller à l’accueil</ButtonLink>
+          <ButtonLink href="/accueil">{t("Aller à l’accueil")}</ButtonLink>
         ) : (
           <Button type="button" disabled>
-            Aller à l’accueil
+            {t("Aller à l’accueil")}
           </Button>
         )}
       </div>

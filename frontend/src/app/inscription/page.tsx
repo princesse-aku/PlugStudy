@@ -10,6 +10,7 @@ import { Field, PasswordInput, TextInput, describedBy } from "@/components/Field
 import { Logo } from "@/components/Logo";
 import { Screen } from "@/components/Screen";
 import { destinationFor, useAuth } from "@/lib/auth-context";
+import { useI18n } from "@/lib/i18n";
 
 const MOT_DE_PASSE_MIN = 8;
 const PASSWORD_HINT = "8 caractères minimum.";
@@ -22,9 +23,12 @@ interface Errors {
   form?: string;
 }
 
+type Action = () => unknown;
+
 /** Écran 3 · Créer un compte : nom, e-mail, mot de passe, conditions, ou Google. */
 export default function InscriptionPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const { ready, user, profile, signUpWithEmail, signInWithGoogle } = useAuth();
   const [nom, setNom] = useState("");
   const [email, setEmail] = useState("");
@@ -39,7 +43,7 @@ export default function InscriptionPage() {
     if (ready && user) router.replace(destinationFor(user, profile));
   }, [ready, user, profile, router]);
 
-  async function run(kind: "email" | "google", action: () => Promise<void>) {
+  async function run(kind: "email" | "google", action: Action) {
     setErrors((current) => ({ ...current, form: undefined }));
     setBusy(kind);
     try {
@@ -69,19 +73,19 @@ export default function InscriptionPage() {
       <DemoBanner />
       <header className="flex flex-col items-center gap-3 px-6 pt-7">
         <Logo width={210} />
-        <h1 className="text-center font-display text-[26px] font-bold leading-tight">Crée ton compte</h1>
+        <h1 className="text-center font-display text-[26px] font-bold leading-tight">{t("Crée ton compte")}</h1>
       </header>
 
       <div className="flex flex-1 flex-col gap-3.5 px-6 pb-6 pt-4">
         <AuthTabs active="inscription" />
 
         <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3.5">
-          <Field id="nom" label="Nom complet" error={errors.nom}>
+          <Field id="nom" label={t("Nom complet")} error={errors.nom ? t(errors.nom) : undefined}>
             <TextInput
               id="nom"
               name="name"
               autoComplete="name"
-              placeholder="Prénom et nom"
+              placeholder={t("Prénom et nom")}
               value={nom}
               onChange={(event) => setNom(event.target.value)}
               aria-invalid={errors.nom ? true : undefined}
@@ -89,14 +93,14 @@ export default function InscriptionPage() {
             />
           </Field>
 
-          <Field id="email" label="Adresse e-mail" error={errors.email}>
+          <Field id="email" label={t("Adresse e-mail")} error={errors.email ? t(errors.email) : undefined}>
             <TextInput
               id="email"
               name="email"
               type="email"
               inputMode="email"
               autoComplete="email"
-              placeholder="abc@gmail.com"
+              placeholder={"abc@gmail.com"}
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               aria-invalid={errors.email ? true : undefined}
@@ -104,12 +108,12 @@ export default function InscriptionPage() {
             />
           </Field>
 
-          <Field id="mdp" label="Mot de passe" hint={PASSWORD_HINT} error={errors.password}>
+          <Field id="mdp" label={t("Mot de passe")} hint={t(PASSWORD_HINT)} error={errors.password ? t(errors.password) : undefined}>
             <PasswordInput
               id="mdp"
               name="password"
               autoComplete="new-password"
-              placeholder="Choisis un mot de passe"
+              placeholder={t("Choisis un mot de passe")}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               aria-invalid={errors.password ? true : undefined}
@@ -128,29 +132,29 @@ export default function InscriptionPage() {
                 aria-describedby={errors.conditions ? "conditions-error" : undefined}
                 className="h-6 w-6 shrink-0 accent-accent"
               />
-              J’accepte les conditions d’utilisation
+              {t("J’accepte les conditions d’utilisation")}
             </label>
             {errors.conditions ? (
               <p id="conditions-error" role="alert" className="text-[13px] leading-snug text-danger">
-                {errors.conditions}
+                {t(errors.conditions)}
               </p>
             ) : null}
           </div>
 
           {errors.form ? (
             <p role="alert" className="rounded-xl bg-danger-bg px-4 py-3 text-sm text-danger">
-              {errors.form}
+              {t(errors.form)}
             </p>
           ) : null}
 
           <Button type="submit" disabled={busy !== null} aria-busy={busy === "email"}>
-            {busy === "email" ? "Création du compte…" : "Créer mon compte"}
+            {busy === "email" ? t("Création du compte…") : t("Créer mon compte")}
           </Button>
         </form>
 
         <div className="flex items-center gap-3 text-sm text-muted" aria-hidden="true">
           <span className="h-px flex-1 bg-line" />
-          ou
+          {t("ou")}
           <span className="h-px flex-1 bg-line" />
         </div>
 
@@ -161,13 +165,13 @@ export default function InscriptionPage() {
           aria-busy={busy === "google"}
           onClick={() => void run("google", signInWithGoogle)}
         >
-          {busy === "google" ? "Ouverture de Google…" : "Continuer avec Google"}
+          {busy === "google" ? t("Ouverture de Google…") : t("Continuer avec Google")}
         </Button>
 
         <p className="flex flex-wrap items-center justify-center gap-x-1.5 text-sm text-muted">
-          Tu as déjà un compte ?
+          {t("Tu as déjà un compte ?")}
           <Link href="/connexion" className="flex min-h-11 items-center font-semibold text-deep">
-            Se connecter
+            {t("Se connecter")}
           </Link>
         </p>
       </div>

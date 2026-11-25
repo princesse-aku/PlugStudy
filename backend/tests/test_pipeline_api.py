@@ -204,10 +204,11 @@ def client(store, settings):
     app.dependency_overrides.clear()
 
 
-def upload(client, name="cours.txt", data=None, course_id=COURSE_ID):
+def upload(client, name="cours.txt", data=None, course_id=COURSE_ID, language=None):
     return client.post(
         f"/courses/{course_id}/process",
         files={"file": (name, data if data is not None else COURSE_TEXT.encode(), "application/octet-stream")},
+        data={"language": language} if language else None,
     )
 
 
@@ -396,3 +397,81 @@ class TestQuizRetries:
         ai = FakeAI()
         run(store, settings, ai=ai)
         assert len(self.questions_calls(ai)) == 1
+
+
+class TestLanguage:
+    """Résumé, notions et quiz sont écrits dans la langue de l'étudiant ; le cours, lui, reste dans sa langue."""
+
+    def test_francais_par_defaut(self, store, settings):
+        ai = FakeAI()
+        course = run(store, settings, ai=ai)
+        assert course["language"] == "fr"
+        assert all("français simple" in p for p in ai.prompts)
+        assert not any("simple English" in p for p in ai.prompts)
+        notion = store.list(course_path(UID, COURSE_ID, "notions"))[0]
+        assert ", chap. " in notion["source"]
+
+    def test_anglais_pour_toutes_les_generations(self, store, settings):
+        ai = FakeAI()
+        process_course(store, ai, settings, UID, COURSE_ID, "cours.txt", COURSE_TEXT.encode(), language="en")
+        course = store.get(course_path(UID, COURSE_ID))
+        assert course["status"] == "ready" and course["language"] == "en"
+        # résumé, notions et quiz : chaque appel demande de l'anglais simple
+        assert len(ai.prompts) >= 3 and all("simple English" in p for p in ai.prompts)
+        notion = store.list(course_path(UID, COURSE_ID, "notions"))[0]
+        assert ", ch. " in notion["source"] and ", chap. " not in notion["source"]
+        chunk = store.list(course_path(UID, COURSE_ID, "chunks"))[0]
+        assert ", ch. " in chunk["source"]
+
+    def test_langue_inconnue_retombe_sur_le_francais(self, store, settings):
+        course = run(store, settings)  # défaut
+        assert course["language"] == "fr"
+        process_course(store, FakeAI(), settings, UID, COURSE_ID, "cours.txt", COURSE_TEXT.encode(), language="xx")
+        assert store.get(course_path(UID, COURSE_ID))["language"] == "fr"
+
+    def test_titre_anglais_mais_calculs_sur_le_terme_du_cours(self, settings):
+        doc = extract_document("c.txt", COURSE_TEXT.encode())
+        infos = page_infos(doc)
+        english = [{**NOTIONS[0], "title": "Algorithmic complexity", "term": "Complexité algorithmique"}]
+        raw = extract_raw_notions(FakeAI(notions=english), doc, settings, "en")
+        built = build_notions(raw, doc, infos, "Algorithmique", settings, "en")
+        data = built[0].data
+        assert data["title"] == "Algorithmic complexity"
+        assert data["frequency"] == 1.0 and data["position"] == 0.7  # calculés sur « Complexité algorithmique »
+        assert data["excerpt"].startswith("La complexité algorithmique")  # l'extrait reste dans la langue du cours
+
+    def test_sans_terme_le_titre_sert_de_repli(self, settings):
+        doc = extract_document("c.txt", COURSE_TEXT.encode())
+        raw = extract_raw_notions(FakeAI(), doc, settings)
+        assert all(n.term is None and n.key_term == n.title for n in raw)
+
+    def test_etiquettes_de_source(self):
+        from app.analysis import source_label
+        from app.extract import Document, Page
+
+        pptx = Document([Page(3, "x")], "diapo")
+        txt = Document([Page(2, "x")], "partie")
+        infos = {3: type("I", (), {"chapter": None})(), 2: type("I", (), {"chapter": "4"})()}
+        assert source_label("Cours", pptx, infos, 3, "fr") == "Cours, diapo 3"
+        assert source_label("Cours", pptx, infos, 3, "en") == "Cours, slide 3"
+        assert source_label("Cours", txt, infos, 2, "fr") == "Cours, chap. 4, partie 2"
+        assert source_label("Cours", txt, infos, 2, "en") == "Cours, ch. 4, part 2"
+
+    def test_message_introuvable_en_anglais(self):
+        assert "I can't find that in your Algorithmique course" in not_found_message("Algorithmique", "en")
+        assert "Je ne trouve pas ça" in not_found_message("Algorithmique")
+
+
+class TestLanguageApi:
+    def test_le_champ_language_est_garde_sur_le_cours(self, client, store):
+        assert upload(client, language="en").status_code == 202
+        assert store.get(course_path(UID, COURSE_ID))["language"] == "en"
+
+    def test_langue_invalide_devient_le_francais(self, client, store):
+        assert upload(client, language="de").status_code == 202
+        assert store.get(course_path(UID, COURSE_ID))["language"] == "fr"
+
+    def test_l_assistant_repond_dans_la_langue_du_cours(self, client, store):
+        assert upload(client, language="en").status_code == 202
+        body = client.post(f"/courses/{COURSE_ID}/assistant", json={"question": "Who won the football world cup?"}).json()
+        assert body["text"].startswith("I can't find that")

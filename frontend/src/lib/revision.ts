@@ -1,3 +1,4 @@
+import { translate, type Lang } from "@/lib/i18n/translate";
 import type { Notion, Question, QuizAnswer } from "@/lib/types";
 
 export type Importance = "indispensable" | "important" | "secondaire";
@@ -15,11 +16,14 @@ export function importanceOf(notion: Pick<Notion, "importance" | "frequency" | "
   return "secondaire";
 }
 
+/** Libellés français (clés de traduction) ; à passer par `t()` ou `translate()` à l'affichage. */
 export const IMPORTANCE_LABEL: Record<Importance, string> = {
   indispensable: "Indispensable",
   important: "Important",
   secondaire: "Secondaire",
 };
+
+export const importanceLabel = (level: Importance, lang: Lang = "fr"): string => translate(IMPORTANCE_LABEL[level], lang);
 
 /** Notions classées de la plus à la moins prioritaire. */
 export function rankNotions(notions: Notion[]): Notion[] {
@@ -67,19 +71,19 @@ export function scorePercent(score: number, total: number): number {
 }
 
 /** Titre du résultat du quiz. */
-export function resultTitle(percent: number): string {
-  if (percent === 100) return "Parfait !";
-  if (percent >= 75) return "Bien joué !";
-  if (percent >= 50) return "Tu progresses.";
-  return "Courage, on revoit ça.";
+export function resultTitle(percent: number, lang: Lang = "fr"): string {
+  if (percent === 100) return translate("Parfait !", lang);
+  if (percent >= 75) return translate("Bien joué !", lang);
+  if (percent >= 50) return translate("Tu progresses.", lang);
+  return translate("Courage, on revoit ça.", lang);
 }
 
 /** Message du Suivi selon la progression globale. */
-export function progressMessage(percent: number): { title: string; text: string } {
-  if (percent === 0) return { title: "Prêt à commencer ?", text: "Lance ta première séance." };
-  if (percent < 40) return { title: "C’est un début !", text: "Chaque séance compte." };
-  if (percent < 70) return { title: "Bien parti !", text: "Continue comme ça." };
-  return { title: "Très bien !", text: "Garde le rythme." };
+export function progressMessage(percent: number, lang: Lang = "fr"): { title: string; text: string } {
+  if (percent === 0) return { title: translate("Prêt à commencer ?", lang), text: translate("Lance ta première séance.", lang) };
+  if (percent < 40) return { title: translate("C’est un début !", lang), text: translate("Chaque séance compte.", lang) };
+  if (percent < 70) return { title: translate("Bien parti !", lang), text: translate("Continue comme ça.", lang) };
+  return { title: translate("Très bien !", lang), text: translate("Garde le rythme.", lang) };
 }
 
 export function wrongAnswers(answers: QuizAnswer[]): QuizAnswer[] {

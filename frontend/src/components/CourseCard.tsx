@@ -1,6 +1,9 @@
+"use client";
+
 import Link from "next/link";
 import { CheckIcon, HalfCircleIcon } from "@/components/Icons";
 import { isDone } from "@/lib/courses";
+import { useI18n, type Lang } from "@/lib/i18n";
 import { shortDate } from "@/lib/time";
 import type { Course } from "@/lib/types";
 
@@ -20,16 +23,17 @@ export function ProgressBar({ value, label }: { value: number; label: string }) 
   );
 }
 
-function subtitle(course: Course): string {
-  if (course.status === "preparing") return "Préparation en cours…";
-  if (course.status === "error") return "Préparation impossible";
-  if (isDone(course)) return "Tout révisé";
-  if (course.examDate) return `Examen : ${shortDate(course.examDate)}`;
-  return "Pas de date d’examen";
+function subtitle(course: Course, t: (text: string, vars?: Record<string, string | number>) => string, lang: Lang): string {
+  if (course.status === "preparing") return t("Préparation en cours…");
+  if (course.status === "error") return t("Préparation impossible");
+  if (isDone(course)) return t("Tout révisé");
+  if (course.examDate) return t("Examen : {date}", { date: shortDate(course.examDate, lang) });
+  return t("Pas de date d’examen");
 }
 
 /** Carte d'un cours dans « Mes cours » (écrans 10 et 13). */
 export function CourseCard({ course }: { course: Course }) {
+  const { t, lang } = useI18n();
   const done = isDone(course);
   return (
     <Link
@@ -45,13 +49,13 @@ export function CourseCard({ course }: { course: Course }) {
         >
           {done || course.status === "error" ? null : <HalfCircleIcon />}
           {done ? <CheckIcon size={14} /> : null}
-          {course.status === "error" ? "À refaire" : done ? "Terminé" : "En cours"}
+          {course.status === "error" ? t("À refaire") : done ? t("Terminé") : t("En cours")}
         </span>
       </div>
-      <span className="text-[13px] text-muted">{subtitle(course)}</span>
+      <span className="text-[13px] text-muted">{subtitle(course, t, lang)}</span>
       <div className="flex items-center gap-3">
         <div className="flex-1">
-          <ProgressBar value={course.progress} label={`Progression de ${course.name}`} />
+          <ProgressBar value={course.progress} label={t("Progression de {name}", { name: course.name })} />
         </div>
         <span className="min-w-11 text-right text-sm font-bold text-pale2">{course.progress} %</span>
       </div>

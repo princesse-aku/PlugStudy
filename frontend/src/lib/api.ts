@@ -11,15 +11,20 @@ async function authHeaders(): Promise<Record<string, string> | null> {
   return token ? { Authorization: `Bearer ${token}` } : null;
 }
 
-/** Message d'erreur prêt à montrer, tiré de la réponse du backend (champ `detail`) quand il est lisible. */
-async function messageOf(response: Response, fallback: string): Promise<string> {
-  try {
-    const body = (await response.json()) as { detail?: unknown };
-    if (typeof body.detail === "string") return body.detail;
-  } catch {
-    // Réponse sans JSON : on garde le message par défaut.
+/** Message d'erreur (français, traduit à l'affichage) choisi d'après le code HTTP, jamais d'après le texte du serveur. */
+function messageForStatus(status: number): string {
+  switch (status) {
+    case 401:
+      return "Ta session a expiré. Connecte-toi de nouveau.";
+    case 413:
+      return "Ce fichier est trop volumineux.";
+    case 415:
+      return "Ce format n’est pas pris en charge. Choisis un PDF, DOCX, PPTX ou TXT.";
+    case 429:
+      return "Trop de demandes. Réessaie dans une minute.";
+    default:
+      return "Le fichier n’a pas pu être envoyé. Réessaie.";
   }
-  return fallback;
 }
 
 /**
@@ -27,20 +32,27 @@ async function messageOf(response: Response, fallback: string): Promise<string> 
  * Renvoie false quand le backend n'est pas branché (mode démo, ou NEXT_PUBLIC_API_URL vide) : rien n'est envoyé.
  * Le fichier n'est gardé nulle part : le backend le lit en mémoire puis l'oublie.
  */
-export async function sendCourseFile(courseId: string, file: File): Promise<boolean> {
+export async function sendCourseFile(courseId: string, file: File, language: "fr" | "en" = "fr"): Promise<boolean> {
   const headers = await authHeaders();
   if (!headers) return false;
   const body = new FormData();
   body.append("file", file);
-  let response: Response;
-  try {
-    response = await fetch(`${apiUrl()}/courses/${encodeURIComponent(courseId)}/process`, { method: "POST", headers, body });
-  } catch {
-    throw new UserFacingError("Impossible de joindre le serveur. Vérifie ta connexion et réessaie.");
+  body.append("language", language); // résumé, notions et quiz sont écrits dans cette langue
+  // L'hébergement gratuit endort le serveur : on le réveille d'abord (sans garder le fichier en attente),
+  // puis on retente une fois si le réseau coupe pendant l'envoi.
+  await fetch(`${apiUrl()}/health`, { signal: AbortSignal.timeout(60_000) }).catch(() => undefined);
+  let response: Response | undefined;
+  for (let attempt = 0; attempt < 2 && !response; attempt++) {
+    try {
+      response = await fetch(`${apiUrl()}/courses/${encodeURIComponent(courseId)}/process`, { method: "POST", headers, body });
+    } catch {
+      response = undefined;
+    }
   }
+  if (!response) throw new UserFacingError("Impossible de joindre le serveur. Vérifie ta connexion et réessaie.");
   // 409 : le cours est déjà en préparation, ce qui est le résultat voulu.
   if (!response.ok && response.status !== 409) {
-    throw new UserFacingError(await messageOf(response, "Le fichier n’a pas pu être envoyé. Réessaie."));
+    throw new UserFacingError(messageForStatus(response.status));
   }
   return true;
 }

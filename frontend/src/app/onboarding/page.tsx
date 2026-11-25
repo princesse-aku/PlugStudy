@@ -7,6 +7,7 @@ import { DemoBanner } from "@/components/DemoBanner";
 import { Field, Segmented, Select, TextInput, describedBy } from "@/components/Field";
 import { Screen } from "@/components/Screen";
 import { useAuth } from "@/lib/auth-context";
+import { useI18n } from "@/lib/i18n";
 import { NIVEAUX, type Langue, type Niveau } from "@/lib/types";
 
 const FILIERE_HINT = "Écris-la comme sur ton emploi du temps, par exemple Informatique ou Droit.";
@@ -15,6 +16,7 @@ const UNIVERSITE_HINT = "Par exemple UAC, UPM ou le nom de ton école.";
 /** Écrans 6 et 7 · Onboarding : niveau (liste), filière et université (saisie libre), langue (facultative). */
 export default function OnboardingPage() {
   const router = useRouter();
+  const { t, setLang } = useI18n();
   const { ready, user, profile, saveProfile } = useAuth();
   const checked = useRef(false);
 
@@ -59,31 +61,31 @@ export default function OnboardingPage() {
     <Screen>
       <DemoBanner />
       <header className="flex flex-col gap-2 px-6 pb-2 pt-7">
-        <p className="text-[13px] font-bold uppercase tracking-[0.08em] text-deep">Pour commencer</p>
-        <h1 className="font-display text-[26px] font-bold leading-tight">Permets-nous de mieux te connaître</h1>
+        <p className="text-[13px] font-bold uppercase tracking-[0.08em] text-deep">{t("Pour commencer")}</p>
+        <h1 className="font-display text-[26px] font-bold leading-tight">{t("Permets-nous de mieux te connaître")}</h1>
         <p className="text-[15px] leading-relaxed text-muted">
-          Trois choix pour adapter PlugStudy à tes cours. Tu pourras les modifier plus tard.
+          {t("Trois choix pour adapter PlugStudy à tes cours. Tu pourras les modifier plus tard.")}
         </p>
       </header>
 
       <form onSubmit={onSubmit} noValidate className="flex flex-1 flex-col">
         <div className="flex flex-1 flex-col gap-4 px-6 py-2">
-          <Field id="niveau" label="Niveau d’étude">
+          <Field id="niveau" label={t("Niveau d’étude")}>
             <Select id="niveau" name="niveau" value={niveau} onChange={(event) => setNiveau(event.target.value as Niveau)}>
               {NIVEAUX.map((option) => (
                 <option key={option} value={option}>
-                  {option}
+                  {t(option)}
                 </option>
               ))}
             </Select>
           </Field>
 
-          <Field id="filiere" label="Filière" hint={FILIERE_HINT} error={errors.filiere}>
+          <Field id="filiere" label={t("Filière")} hint={t(FILIERE_HINT)} error={errors.filiere ? t(errors.filiere) : undefined}>
             <TextInput
               id="filiere"
               name="filiere"
               autoComplete="off"
-              placeholder="Écris ta filière"
+              placeholder={t("Écris ta filière")}
               value={filiere}
               onChange={(event) => setFiliere(event.target.value)}
               aria-invalid={errors.filiere ? true : undefined}
@@ -91,12 +93,12 @@ export default function OnboardingPage() {
             />
           </Field>
 
-          <Field id="universite" label="Université ou école" hint={UNIVERSITE_HINT} error={errors.universite}>
+          <Field id="universite" label={t("Université ou école")} hint={t(UNIVERSITE_HINT)} error={errors.universite ? t(errors.universite) : undefined}>
             <TextInput
               id="universite"
               name="universite"
               autoComplete="off"
-              placeholder="Écris ton université ou ton école"
+              placeholder={t("Écris ton université ou ton école")}
               value={universite}
               onChange={(event) => setUniversite(event.target.value)}
               aria-invalid={errors.universite ? true : undefined}
@@ -105,13 +107,16 @@ export default function OnboardingPage() {
           </Field>
 
           <Segmented<Langue>
-            label="Langue"
+            label={t("Langue")}
             optional
             value={langue}
-            onChange={setLangue}
+            onChange={(value) => {
+              setLangue(value);
+              setLang(value);
+            }}
             options={[
-              { value: "fr", label: "Français" },
-              { value: "en", label: "English" },
+              { value: "fr", label: t("Français") },
+              { value: "en", label: t("English") },
             ]}
           />
         </div>
@@ -119,14 +124,14 @@ export default function OnboardingPage() {
         <div className="flex flex-col gap-3 px-6 pb-6 pt-2">
           {errors.form ? (
             <p role="alert" className="rounded-xl bg-danger-bg px-4 py-3 text-sm text-danger">
-              {errors.form}
+              {t(errors.form)}
             </p>
           ) : null}
           <Button type="submit" disabled={saving} aria-busy={saving}>
-            {saving ? "Enregistrement…" : "Continuer"}
+            {saving ? t("Enregistrement…") : t("Continuer")}
           </Button>
           <p className="text-center text-[13px] leading-relaxed text-muted">
-            Ces informations servent à préparer des cours types pour ta filière.
+            {t("Ces informations servent à préparer des cours types pour ta filière.")}
           </p>
         </div>
       </form>

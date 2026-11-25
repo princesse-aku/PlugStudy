@@ -8,6 +8,7 @@ import { Button } from "@/components/Button";
 import { Field, Segmented, Select, TextInput, describedBy } from "@/components/Field";
 import { LogoutIcon } from "@/components/Icons";
 import { useAuth } from "@/lib/auth-context";
+import { useI18n } from "@/lib/i18n";
 import { features } from "@/lib/features";
 import { NIVEAUX, type Langue, type Niveau, type Profile } from "@/lib/types";
 
@@ -21,6 +22,7 @@ function initials(name: string | null, email: string | null): string {
 
 function ProfilForm({ profile }: { profile: Profile }) {
   const { user, saveProfile, updateName } = useAuth();
+  const { t, setLang } = useI18n();
   const [name, setName] = useState(user?.displayName ?? "");
   const [niveau, setNiveau] = useState<Niveau>(profile.niveau);
   const [filiere, setFiliere] = useState(profile.filiere);
@@ -57,6 +59,7 @@ function ProfilForm({ profile }: { profile: Profile }) {
     try {
       await saveProfile({ niveau, filiere: filiere.trim(), universite: universite.trim(), langue });
       if (name.trim() !== (user?.displayName ?? "")) await updateName(name.trim());
+      setLang(langue);
       setSaved(true);
     } catch {
       setErrors({ form: "Impossible d’enregistrer tes modifications. Vérifie ta connexion et réessaie." });
@@ -67,11 +70,11 @@ function ProfilForm({ profile }: { profile: Profile }) {
 
   return (
     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3.5 px-5 pt-3">
-      <Field id="nom" label="Nom complet" error={errors.nom}>
+      <Field id="nom" label={t("Nom complet")} error={errors.nom ? t(errors.nom) : undefined}>
         <TextInput
           id="nom"
           autoComplete="name"
-          placeholder="Prénom et nom"
+          placeholder={t("Prénom et nom")}
           value={name}
           onChange={(event) => touch(setName)(event.target.value)}
           aria-invalid={errors.nom ? true : undefined}
@@ -79,21 +82,21 @@ function ProfilForm({ profile }: { profile: Profile }) {
         />
       </Field>
 
-      <Field id="niveau" label="Niveau d’étude">
+      <Field id="niveau" label={t("Niveau d’étude")}>
         <Select id="niveau" value={niveau} onChange={(event) => touch(setNiveau)(event.target.value as Niveau)}>
           {NIVEAUX.map((item) => (
             <option key={item} value={item}>
-              {item}
+              {t(item)}
             </option>
           ))}
         </Select>
       </Field>
 
-      <Field id="filiere" label="Filière" hint={FILIERE_HINT} error={errors.filiere}>
+      <Field id="filiere" label={t("Filière")} hint={t(FILIERE_HINT)} error={errors.filiere ? t(errors.filiere) : undefined}>
         <TextInput
           id="filiere"
           autoComplete="off"
-          placeholder="Écris ta filière"
+          placeholder={t("Écris ta filière")}
           value={filiere}
           onChange={(event) => touch(setFiliere)(event.target.value)}
           aria-invalid={errors.filiere ? true : undefined}
@@ -101,11 +104,11 @@ function ProfilForm({ profile }: { profile: Profile }) {
         />
       </Field>
 
-      <Field id="universite" label="Université ou école" error={errors.universite}>
+      <Field id="universite" label={t("Université ou école")} error={errors.universite ? t(errors.universite) : undefined}>
         <TextInput
           id="universite"
           autoComplete="off"
-          placeholder="Écris ton université ou ton école"
+          placeholder={t("Écris ton université ou ton école")}
           value={universite}
           onChange={(event) => touch(setUniversite)(event.target.value)}
           aria-invalid={errors.universite ? true : undefined}
@@ -114,28 +117,28 @@ function ProfilForm({ profile }: { profile: Profile }) {
       </Field>
 
       <Segmented
-        label="Langue"
+        label={t("Langue")}
         value={langue}
         onChange={touch(setLangue)}
         options={[
-          { value: "fr", label: "Français" },
-          { value: "en", label: "English" },
+          { value: "fr", label: t("Français") },
+          { value: "en", label: t("English") },
         ]}
       />
 
       {errors.form ? (
         <p role="alert" className="rounded-xl bg-danger-bg px-4 py-3 text-sm text-danger">
-          {errors.form}
+          {t(errors.form)}
         </p>
       ) : null}
       {saved ? (
         <p role="status" className="rounded-xl bg-pale px-4 py-3 text-sm text-pale2">
-          Modifications enregistrées.
+          {t("Modifications enregistrées.")}
         </p>
       ) : null}
 
       <Button type="submit" disabled={!dirty || saving} aria-busy={saving}>
-        {saving ? "Enregistrement…" : "Enregistrer les modifications"}
+        {saving ? t("Enregistrement…") : t("Enregistrer les modifications")}
       </Button>
     </form>
   );
@@ -144,12 +147,13 @@ function ProfilForm({ profile }: { profile: Profile }) {
 /** Écran 25 · Profil : nom, niveau, filière, université, langue ; déconnexion et suppression du compte. */
 export default function ProfilPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const { user, profile, signOut } = useAuth();
 
   return (
     <AppShell active="profil">
       <header className="px-5 pb-1 pt-6">
-        <h1 className="font-display text-[26px] font-bold leading-tight">Profil</h1>
+        <h1 className="font-display text-[26px] font-bold leading-tight">{t("Profil")}</h1>
       </header>
 
       <div className="flex items-center gap-4 px-5 pt-3">
@@ -160,16 +164,16 @@ export default function ProfilPage() {
           {initials(user?.displayName ?? null, user?.email ?? null)}
         </div>
         <div className="flex min-w-0 flex-col">
-          <p className="truncate font-display text-lg font-bold">{user?.displayName ?? "Ton profil"}</p>
+          <p className="truncate font-display text-lg font-bold">{user?.displayName ?? t("Ton profil")}</p>
           <p className="truncate text-sm text-muted">{user?.email}</p>
           {features.profilePhoto ? (
             <button
               type="button"
               disabled
-              title="Bientôt disponible"
+              title={t("Bientôt disponible")}
               className="flex min-h-11 items-center self-start text-sm font-semibold text-muted opacity-70"
             >
-              Changer la photo
+              {t("Changer la photo")}
             </button>
           ) : null}
         </div>
@@ -187,11 +191,11 @@ export default function ProfilPage() {
           className="flex min-h-12 items-center justify-center gap-2 rounded-[14px] border border-line bg-card text-base font-semibold text-ink"
         >
           <LogoutIcon />
-          Se déconnecter
+          {t("Se déconnecter")}
         </button>
         {features.deleteAccount ? (
           <Link href="/profil/suppression" className="flex min-h-11 items-center justify-center text-sm font-semibold text-danger">
-            Supprimer mon compte
+            {t("Supprimer mon compte")}
           </Link>
         ) : null}
       </div>

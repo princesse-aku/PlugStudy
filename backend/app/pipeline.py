@@ -34,8 +34,17 @@ def _fail(store: Store, uid: str, course_id: str, reason: str) -> None:
 
 
 def process_course(
-    store: Store, ai: AIClient, settings: Settings, uid: str, course_id: str, filename: str, data: bytes
+    store: Store,
+    ai: AIClient,
+    settings: Settings,
+    uid: str,
+    course_id: str,
+    filename: str,
+    data: bytes,
+    language: str = "fr",
 ) -> None:
+    """`language` : langue de l'étudiant (« fr » ou « en ») ; résumé, notions et quiz sont écrits dans cette langue."""
+    language = "en" if language == "en" else "fr"
     path = course_path(uid, course_id)
     course = store.get(path) or {}
     name = str(course.get("name") or "Cours")
@@ -44,7 +53,7 @@ def process_course(
         store.set(path, {"prepStep": count, **fields}, merge=True)
 
     try:
-        store.set(path, {"status": "preparing", "prepStep": 0, "errorReason": None}, merge=True)
+        store.set(path, {"status": "preparing", "prepStep": 0, "errorReason": None, "language": language}, merge=True)
 
         # 1. Lecture du fichier.
         try:
@@ -61,10 +70,10 @@ def process_course(
 
         # 2. Fiche résumée : résumé + notions (importance par l'IA, fréquence et position calculées).
         with ThreadPoolExecutor(max_workers=2) as pool:  # indépendants : on les lance ensemble
-            summary_job = pool.submit(summarize, ai, doc, settings)
-            notions_job = pool.submit(extract_raw_notions, ai, doc, settings)
+            summary_job = pool.submit(summarize, ai, doc, settings, language)
+            notions_job = pool.submit(extract_raw_notions, ai, doc, settings, language)
             summary, raw = summary_job.result(), notions_job.result()
-        notions = build_notions(raw, doc, infos, name, settings)
+        notions = build_notions(raw, doc, infos, name, settings, language)
         if not notions:
             _fail(store, uid, course_id, ERROR_EMPTY)
             return
@@ -77,7 +86,7 @@ def process_course(
         questions: list = []
         for attempt in range(QUIZ_ATTEMPTS):
             try:
-                found = generate_questions(ai, notions, doc, settings)
+                found = generate_questions(ai, notions, doc, settings, language)
             except AIError:
                 if attempt == QUIZ_ATTEMPTS - 1 and not questions:
                     raise
@@ -101,7 +110,7 @@ def process_course(
             record: dict[str, Any] = {
                 "text": chunk.text,
                 "page": chunk.page,
-                "source": source_label(name, doc, infos, chunk.page),
+                "source": source_label(name, doc, infos, chunk.page, language),
             }
             if chunk.chapter:
                 record["chapter"] = chunk.chapter

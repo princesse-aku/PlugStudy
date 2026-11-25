@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useI18n } from "@/lib/i18n";
 import { Button } from "./Button";
 
 const DISMISSED_KEY = "plugstudy:install-dismissed";
@@ -35,6 +36,7 @@ function wasDismissed() {
  * Il disparaît une fois l'application installée ou après « Plus tard ».
  */
 export function InstallBanner() {
+  const { t } = useI18n();
   const [prompt, setPrompt] = useState<InstallPromptEvent | null>(null);
   const [ios, setIos] = useState(false);
   const [hidden, setHidden] = useState(true);
@@ -81,22 +83,22 @@ export function InstallBanner() {
 
   return (
     <section
-      aria-label="Installer l’application"
+      aria-label={t("Installer l’application")}
       className="flex flex-col gap-3 rounded-[14px] border border-line bg-card px-4 py-3.5"
     >
       <div className="flex flex-col gap-1">
-        <h2 className="font-display text-base font-bold leading-snug">Installe PlugStudy</h2>
+        <h2 className="font-display text-base font-bold leading-snug">{t("Installe PlugStudy")}</h2>
         <p className="text-sm leading-relaxed text-muted">
           {prompt
-            ? "Ouvre l’application comme une app, directement depuis ton écran d’accueil."
-            : "Touche le bouton Partager, puis « Sur l’écran d’accueil » pour ouvrir PlugStudy comme une app."}
+            ? t("Ouvre l’application comme une app, directement depuis ton écran d’accueil.")
+            : t("Touche le bouton Partager, puis « Sur l’écran d’accueil » pour ouvrir PlugStudy comme une app.")}
         </p>
       </div>
       <div className="flex items-center gap-2">
         {prompt ? (
           <div className="flex-1">
             <Button type="button" onClick={() => void install()}>
-              Installer
+              {t("Installer")}
             </Button>
           </div>
         ) : null}
@@ -105,7 +107,7 @@ export function InstallBanner() {
           onClick={dismiss}
           className="flex min-h-11 items-center justify-center px-4 text-sm font-semibold text-deep"
         >
-          Plus tard
+          {t("Plus tard")}
         </button>
       </div>
     </section>

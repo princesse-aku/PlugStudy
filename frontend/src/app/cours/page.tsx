@@ -7,10 +7,12 @@ import { CourseCard } from "@/components/CourseCard";
 import { CheckIcon } from "@/components/Icons";
 import { useAuth } from "@/lib/auth-context";
 import { countCourses, filterCourses, type CourseFilter } from "@/lib/courses";
+import { useI18n } from "@/lib/i18n";
 import { useCourses } from "@/lib/use-courses";
 
 function MesCours() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const { courses, loaded } = useCourses(user?.uid);
   const added = useSearchParams().get("ajoute") === "1";
   const [filter, setFilter] = useState<CourseFilter>("tous");
@@ -18,21 +20,23 @@ function MesCours() {
   const counts = countCourses(courses);
   const visible = filterCourses(courses, filter);
   const tabs: { id: CourseFilter; label: string; count: number }[] = [
-    { id: "tous", label: "Tous", count: counts.all },
-    { id: "en-cours", label: "En cours", count: counts.inProgress },
-    { id: "termines", label: "Terminés", count: counts.done },
+    { id: "tous", label: t("Tous"), count: counts.all },
+    { id: "en-cours", label: t("En cours"), count: counts.inProgress },
+    { id: "termines", label: t("Terminés"), count: counts.done },
   ];
 
   return (
     <>
       <header className="flex flex-col gap-0.5 px-5 pb-2 pt-6">
-        <h1 className="font-display text-[26px] font-bold leading-tight">Mes cours</h1>
+        <h1 className="font-display text-[26px] font-bold leading-tight">{t("Mes cours")}</h1>
         <p className="text-[15px] text-muted">
-          {counts.all} cours · {counts.done} {counts.done > 1 ? "terminés" : "terminé"}
+          {counts.done > 1
+            ? t("{n} cours · {done} terminés", { n: counts.all, done: counts.done })
+            : t("{n} cours · {done} terminé", { n: counts.all, done: counts.done })}
         </p>
       </header>
 
-      <div role="group" aria-label="Filtrer les cours" className="flex gap-2 px-5 py-1">
+      <div role="group" aria-label={t("Filtrer les cours")} className="flex gap-2 px-5 py-1">
         {tabs.map((tab) => {
           const on = tab.id === filter;
           return (
@@ -61,7 +65,7 @@ function MesCours() {
               <CheckIcon size={16} />
             </span>
             <span>
-              <b>Cours ajouté.</b> L’IA prépare la fiche, le quiz et le plan de révision.
+              <b>{t("Cours ajouté.")}</b> {t("L’IA prépare la fiche, le quiz et le plan de révision.")}
             </span>
           </p>
         ) : null}
@@ -73,8 +77,8 @@ function MesCours() {
         {loaded && visible.length === 0 ? (
           <p className="rounded-2xl border border-line bg-card px-4 py-5 text-center text-[15px] leading-relaxed text-muted">
             {counts.all === 0
-              ? "Tu n’as pas encore de cours. Ajoute ton premier fichier pour commencer."
-              : "Aucun cours dans cette liste."}
+              ? t("Tu n’as pas encore de cours. Ajoute ton premier fichier pour commencer.")
+              : t("Aucun cours dans cette liste.")}
           </p>
         ) : null}
       </div>

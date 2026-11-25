@@ -11,11 +11,13 @@ import { BackHeader, ImportanceBadge, Notice, SourceChip } from "@/components/Re
 import { Screen } from "@/components/Screen";
 import { saveReport, saveStudyTime, useNotions } from "@/lib/data";
 import { features } from "@/lib/features";
+import { useI18n } from "@/lib/i18n";
 import { importanceOf, sessionNotions } from "@/lib/revision";
 import { useCourseScreen } from "@/lib/use-courses";
 
 function Seance() {
   const { id } = useParams<{ id: string }>();
+  const { t } = useI18n();
   const router = useRouter();
   const wanted = useSearchParams().get("notion");
   const state = useCourseScreen(id);
@@ -28,8 +30,8 @@ function Seance() {
   if (state.phase === "missing") {
     return (
       <Screen>
-        <BackHeader href="/cours" title="Cours introuvable" />
-        <Notice>Ce cours n’existe pas ou a été supprimé.</Notice>
+        <BackHeader href="/cours" title={t("Cours introuvable")} />
+        <Notice>{t("Ce cours n’existe pas ou a été supprimé.")}</Notice>
       </Screen>
     );
   }
@@ -58,7 +60,7 @@ function Seance() {
     return (
       <Screen>
         <BackHeader href={`/cours/${id}`} title={course.name} />
-        <Notice>Les notions de ce cours ne sont pas encore prêtes.</Notice>
+        <Notice>{t("Les notions de ce cours ne sont pas encore prêtes.")}</Notice>
       </Screen>
     );
   }
@@ -69,9 +71,9 @@ function Seance() {
   return (
     <Screen>
       <DemoBanner />
-      <BackHeader href={`/cours/${id}`} title={course.name} subtitle={`Notion ${index + 1} sur ${notions.length}`} />
+      <BackHeader href={`/cours/${id}`} title={course.name} subtitle={t("Notion {n} sur {total}", { n: index + 1, total: notions.length })} />
       <div className="px-5 pb-2">
-        <ProgressBar value={Math.round(((index + 1) / notions.length) * 100)} label="Avancement de la séance" />
+        <ProgressBar value={Math.round(((index + 1) / notions.length) * 100)} label={t("Avancement de la séance")} />
       </div>
 
       <div className="flex flex-1 flex-col gap-3.5 px-5 pt-2">
@@ -82,7 +84,7 @@ function Seance() {
 
         <section aria-labelledby="cours" className="flex flex-col gap-2.5 rounded-2xl border border-line bg-card p-4">
           <h3 id="cours" className="text-[13px] font-bold uppercase tracking-[0.08em] text-muted">
-            Ce que dit ton cours
+            {t("Ce que dit ton cours")}
           </h3>
           <p className="text-base leading-relaxed">{notion.excerpt}</p>
           <div>
@@ -92,7 +94,7 @@ function Seance() {
 
         <section aria-labelledby="simple" className="flex flex-col gap-2 rounded-2xl bg-pale p-4">
           <h3 id="simple" className="text-[13px] font-bold uppercase tracking-[0.08em] text-pale2">
-            En termes simples
+            {t("En termes simples")}
           </h3>
           <p className="text-base leading-relaxed text-pale2">{notion.simple}</p>
         </section>
@@ -104,7 +106,7 @@ function Seance() {
               className="flex min-h-11 items-center gap-2 text-[15px] font-semibold text-deep"
             >
               <MessageIcon size={20} />
-              Poser une question
+              {t("Poser une question")}
             </Link>
           ) : (
             <span />
@@ -127,12 +129,12 @@ function Seance() {
             className="flex min-h-11 items-center gap-2 text-[15px] font-semibold text-muted disabled:opacity-70"
           >
             <FlagIcon size={20} />
-            {isReported ? "Signalé, merci" : "Signaler une erreur"}
+            {isReported ? t("Signalé, merci") : t("Signaler une erreur")}
           </button>
         </div>
         {isReported ? (
           <p role="status" className="text-[13px] text-muted">
-            Merci : nous relirons cette notion.
+            {t("Merci : nous relirons cette notion.")}
           </p>
         ) : null}
 
@@ -144,7 +146,7 @@ function Seance() {
               onClick={() => void leave(() => setChosen(index - 1))}
               className="flex min-h-11 items-center text-sm font-semibold text-deep disabled:opacity-40"
             >
-              ← Précédente
+              {t("← Précédente")}
             </button>
             <button
               type="button"
@@ -152,7 +154,7 @@ function Seance() {
               onClick={() => void leave(() => setChosen(index + 1))}
               className="flex min-h-11 items-center text-sm font-semibold text-deep disabled:opacity-40"
             >
-              Notion suivante →
+              {t("Notion suivante →")}
             </button>
           </div>
         ) : null}
@@ -160,7 +162,7 @@ function Seance() {
 
       <div className="px-5 pb-6 pt-2">
         <Button type="button" onClick={() => void leave(() => router.push(`/cours/${id}/quiz`))}>
-          Passer au quiz
+          {t("Passer au quiz")}
         </Button>
       </div>
     </Screen>

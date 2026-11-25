@@ -1,4 +1,7 @@
+"use client";
+
 import { forwardRef, useState, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from "react";
+import { useI18n } from "@/lib/i18n";
 import { ChevronDownIcon, EyeIcon, EyeOffIcon } from "./Icons";
 
 const control =
@@ -20,11 +23,12 @@ export function Field({
   error?: string | null;
   children: ReactNode;
 }) {
+  const { t } = useI18n();
   return (
     <div className="flex flex-col gap-2">
       <label htmlFor={id} className="text-sm font-semibold text-ink">
         {label}
-        {optional ? <span className="font-normal text-muted"> (optionnel)</span> : null}
+        {optional ? <span className="font-normal text-muted"> {t("(optionnel)")}</span> : null}
       </label>
       {children}
       {error ? (
@@ -56,6 +60,7 @@ export const TextInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLIn
 export const PasswordInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
   function PasswordInput({ className = "", ...props }, ref) {
     const [visible, setVisible] = useState(false);
+    const { t } = useI18n();
     return (
       <div className="relative">
         <input
@@ -67,7 +72,7 @@ export const PasswordInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HT
         <button
           type="button"
           onClick={() => setVisible((value) => !value)}
-          aria-label={visible ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+          aria-label={visible ? t("Masquer le mot de passe") : t("Afficher le mot de passe")}
           aria-pressed={visible}
           className="absolute right-1 top-1 flex h-11 w-11 items-center justify-center rounded-lg text-muted"
         >
@@ -105,11 +110,12 @@ export function Segmented<T extends string>({
   options: { value: T; label: string }[];
   onChange: (value: T) => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="flex flex-col gap-2" role="group" aria-label={label}>
       <div className="text-sm font-semibold text-ink">
         {label}
-        {optional ? <span className="font-normal text-muted"> (optionnel)</span> : null}
+        {optional ? <span className="font-normal text-muted"> {t("(optionnel)")}</span> : null}
       </div>
       <div className="flex gap-3">
         {options.map((option) => {

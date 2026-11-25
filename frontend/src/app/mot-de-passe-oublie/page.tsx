@@ -7,10 +7,12 @@ import { DemoBanner } from "@/components/DemoBanner";
 import { Field, TextInput, describedBy } from "@/components/Field";
 import { Screen } from "@/components/Screen";
 import { useAuth } from "@/lib/auth-context";
+import { useI18n } from "@/lib/i18n";
 
 /** Écran 5 · Mot de passe oublié : un champ e-mail et « Envoyer le lien ». */
 export default function MotDePasseOubliePage() {
   const { sendPasswordReset } = useAuth();
+  const { t } = useI18n();
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [sentTo, setSentTo] = useState<string | null>(null);
@@ -45,23 +47,23 @@ export default function MotDePasseOubliePage() {
       <DemoBanner />
       <header className="flex flex-col gap-2 px-6 pt-7">
         <Link href="/connexion" className="-ml-1 flex min-h-11 items-center self-start text-sm font-semibold text-deep">
-          ← Retour à la connexion
+          {t("← Retour à la connexion")}
         </Link>
-        <h1 className="font-display text-[26px] font-bold leading-tight">Mot de passe oublié</h1>
+        <h1 className="font-display text-[26px] font-bold leading-tight">{t("Mot de passe oublié")}</h1>
         <p className="text-[15px] leading-relaxed text-muted">
-          Écris l’adresse e-mail de ton compte. Nous t’envoyons un lien pour choisir un nouveau mot de passe.
+          {t("Écris l’adresse e-mail de ton compte. Nous t’envoyons un lien pour choisir un nouveau mot de passe.")}
         </p>
       </header>
 
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3.5 px-6 pb-6 pt-5">
-        <Field id="email" label="Adresse e-mail" error={error}>
+        <Field id="email" label={t("Adresse e-mail")} error={error ? t(error) : null}>
           <TextInput
             id="email"
             name="email"
             type="email"
             inputMode="email"
             autoComplete="email"
-            placeholder="abc@gmail.com"
+            placeholder={"abc@gmail.com"}
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             aria-invalid={error ? true : undefined}
@@ -71,13 +73,15 @@ export default function MotDePasseOubliePage() {
 
         {sentTo ? (
           <p role="status" className="rounded-xl bg-pale px-4 py-3 text-sm leading-relaxed text-pale2">
-            Si un compte existe avec {sentTo}, tu vas recevoir un lien dans quelques instants. Pense à regarder dans tes
-            courriers indésirables.
+            {t(
+              "Si un compte existe avec {email}, tu vas recevoir un lien dans quelques instants. Pense à regarder dans tes courriers indésirables.",
+              { email: sentTo }
+            )}
           </p>
         ) : null}
 
         <Button type="submit" disabled={busy} aria-busy={busy}>
-          {busy ? "Envoi…" : "Envoyer le lien"}
+          {busy ? t("Envoi…") : t("Envoyer le lien")}
         </Button>
       </form>
     </Screen>

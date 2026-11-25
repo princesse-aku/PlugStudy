@@ -76,7 +76,8 @@ describe("Appels au backend", () => {
   it("envoie le fichier avec le jeton de l'étudiant", async () => {
     fetchMock.mockResolvedValue(ok({ status: "processing" }, 202));
     expect(await sendCourseFile("c1", file)).toBe(true);
-    const [url, init] = fetchMock.mock.calls[0];
+    expect(fetchMock.mock.calls[0][0]).toBe("http://api.test/health"); // réveil du serveur, avant l'envoi
+    const [url, init] = fetchMock.mock.calls.find(([address]) => String(address).endsWith("/process"))!;
     expect(url).toBe("http://api.test/courses/c1/process");
     expect(init.method).toBe("POST");
     expect(init.headers).toEqual({ Authorization: "Bearer jeton" });
@@ -94,7 +95,7 @@ describe("Appels au backend", () => {
 
   it("montre le message du serveur en cas de refus", async () => {
     fetchMock.mockResolvedValue(ok({ detail: "Format non pris en charge. Choisis un PDF, DOCX, PPTX ou TXT." }, 415));
-    await expect(sendCourseFile("c1", file)).rejects.toThrow("Format non pris en charge");
+    await expect(sendCourseFile("c1", file)).rejects.toThrow("Ce format n’est pas pris en charge");
     fetchMock.mockResolvedValue({ ok: false, status: 500, json: async () => Promise.reject(new Error("pas du json")) } as unknown as Response);
     await expect(sendCourseFile("c1", file)).rejects.toBeInstanceOf(UserFacingError);
   });
@@ -135,7 +136,7 @@ describe("Ajouter un cours avec le backend", () => {
     await fillAndSubmit();
     await waitFor(() => expect(router.push).toHaveBeenCalledWith("/cours?ajoute=1"));
     const [created] = read(`plugstudy:demo:courses:${UID}`);
-    expect(fetchMock.mock.calls[0][0]).toBe(`http://api.test/courses/${created.id}/process`);
+    expect(fetchMock.mock.calls.map(([address]) => address)).toContain(`http://api.test/courses/${created.id}/process`);
   });
 
   it("marque le cours « à refaire » si l'envoi échoue, et ouvre son détail", async () => {

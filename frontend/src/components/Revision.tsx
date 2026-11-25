@@ -1,10 +1,14 @@
+"use client";
+
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { BookIcon, ChevronLeftIcon } from "@/components/Icons";
-import { IMPORTANCE_LABEL, type Importance } from "@/lib/revision";
+import { useI18n } from "@/lib/i18n";
+import { importanceLabel, type Importance } from "@/lib/revision";
 
 /** Étiquette de notion : Indispensable, Important, Secondaire. Le cercle (plein, demi, vide) double la couleur. */
 export function ImportanceBadge({ level }: { level: Importance }) {
+  const { lang } = useI18n();
   const style = {
     indispensable: "bg-accent text-on-accent",
     important: "bg-spark text-black",
@@ -22,7 +26,7 @@ export function ImportanceBadge({ level }: { level: Importance }) {
           </>
         )}
       </svg>
-      {IMPORTANCE_LABEL[level]}
+      {importanceLabel(level, lang)}
     </span>
   );
 }
@@ -49,9 +53,10 @@ export function BackHeader({
   subtitle?: string;
   children?: ReactNode;
 }) {
+  const { t } = useI18n();
   return (
     <header className="flex items-center gap-2 px-2 pb-2 pt-3">
-      <Link href={href} aria-label="Retour" className="flex h-11 w-11 shrink-0 items-center justify-center">
+      <Link href={href} aria-label={t("Retour")} className="flex h-11 w-11 shrink-0 items-center justify-center">
         <ChevronLeftIcon />
       </Link>
       <div className="flex min-w-0 flex-col">
