@@ -1,0 +1,28 @@
+node_modules
+.next
+out
+.env
+.env.local
+.env.*.local
+*.tsbuildinfo
+next-env.d.ts
+.firebase
+firebase-debug.log
+
+# Backend Python
+backend/.venv
+backend/.env
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Fichiers de Claude (contexte et réglages de l'assistant) : jamais poussés
+.claude/
+CLAUDE.md
+
+# Secrets : clés Firebase (comptes de service) et variables d'environnement
+.env
+.env.*
+!.env.example
+*-firebase-adminsdk-*.json
+serviceAccount*.json

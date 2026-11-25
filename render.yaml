@@ -1,0 +1,30 @@
+# Déploiement du backend sur Render (« Blueprint ») : New > Blueprint, puis choisir ce dépôt.
+# Les valeurs marquées sync: false sont à saisir dans le tableau de bord Render (elles ne sont jamais dans Git).
+services:
+  - type: web
+    name: plugstudy-api
+    runtime: python
+    rootDir: backend
+    plan: starter  # le plan gratuit s'endort : le traitement d'un cours en arrière-plan pourrait être coupé
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: FIREBASE_PROJECT_ID
+        value: plugstudy-2dd5f
+      - key: FIREBASE_CREDENTIALS_JSON
+        sync: false
+      - key: RODIUMAI_BASE_URL
+        sync: false
+      - key: RODIUMAI_API_KEY
+        sync: false
+      - key: RODIUM_MODEL_STRONG
+        value: google/gemini-3.8-flash
+      - key: RODIUM_MODEL_FAST
+        value: google/gemini-3.8-flash
+      - key: RODIUM_EMBEDDINGS_ENABLED
+        value: "false"
+      - key: ALLOWED_ORIGINS
+        sync: false  # l'adresse Vercel du frontend, par exemple https://plugstudy.vercel.app

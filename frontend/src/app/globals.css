@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Couleurs de la charte graphique PlugStudy, version claire. */
+:root {
+  --screen: #ffffff; /* fond des écrans blancs (animation, connexion) */
+  --page: #f3faf5; /* fond des autres écrans */
+  --card: #ffffff;
+  --line: #d3e8d9;
+  --pale: #e6f4ea;
+  --pale-text: #025f2c;
+  --text: #000000;
+  --muted: #475569;
+  --accent: #03833d;
+  --on-accent: #ffffff;
+  --deep: #025f2c;
+  --field: #6b7f73;
+  --danger: #b42318;
+  --danger-bg: #fef3f2;
+  --spark: #fec502;
+  --neutral: #eef1f0; /* étiquette Secondaire */
+  --neutral-text: #3f4a44;
+}
+
+/* Thème sombre : prêt mais pas encore branché. */
+[data-theme="dark"] {
+  --screen: #0b1710;
+  --page: #0b1710;
+  --card: #12241a;
+  --line: #1f3a2a;
+  --pale: #173a25;
+  --pale-text: #cdefd8;
+  --text: #f2faf4;
+  --muted: #9cb3a4;
+  --accent: #34d073;
+  --on-accent: #0b1710;
+  --deep: #34d073;
+  --field: #4c8a63;
+  --danger: #f97066;
+  --danger-bg: #3a1a17;
+  --spark: #fec502;
+  --neutral: #1b2a21;
+  --neutral-text: #b7c9bd;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--text);
+  font-family: Inter, system-ui, sans-serif;
+  /* Application installée : on laisse la place aux encoches et barres du système. */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pop {
+    animation: none;
+  }
+}
