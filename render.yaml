@@ -5,7 +5,10 @@ services:
     name: plugstudy-api
     runtime: python
     rootDir: backend
-    plan: starter  # le plan gratuit s'endort : le traitement d'un cours en arrière-plan pourrait être coupé
+    region: frankfurt  # le plus proche du Bénin et du Togo, comme Firestore (eur3)
+    # Plan gratuit : le service s'endort après 15 min sans visite (premier appel lent, 30 à 60 s) et une préparation de
+    # cours en cours peut être interrompue. Pour une vraie mise en service, passer à « starter » (environ 7 $/mois).
+    plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
