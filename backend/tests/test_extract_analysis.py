@@ -151,3 +151,24 @@ class TestAnalysis:
         assert source_label("Algorithmique", doc, infos, 1) == "Algorithmique, chap. 1, partie 1"
         pdf = extract_document("c.pdf", make_pdf(COURSE_TEXT))
         assert source_label("Algorithmique", pdf, page_infos(pdf), 1).endswith(", p. 1")
+
+
+class TestDocxSecours:
+    """Un .docx que python-docx refuse (export mobile ou Google Docs) est lu quand même, directement dans le XML."""
+
+    def test_lecture_de_secours(self, monkeypatch):
+        import docx
+
+        data = make_docx(COURSE_TEXT)  # fabriqué avant de saboter python-docx
+
+        def refuse(*args, **kwargs):
+            raise KeyError("styles manquants")
+
+        monkeypatch.setattr(docx, "Document", refuse)
+        doc = extract_document("cours.docx", data)
+        assert "algorithme est une suite d'instructions" in doc.text
+        assert any("CHAPITRE 1" in heading for page in doc.pages for heading in page.headings)
+
+    def test_fichier_qui_n_est_pas_un_docx(self):
+        with pytest.raises(UnsupportedFile):
+            extract_document("cours.docx", b"ceci n'est pas un zip")

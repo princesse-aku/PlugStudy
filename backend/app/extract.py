@@ -8,8 +8,11 @@ vide : le pipeline le refuse avec une erreur d'import claire.
 from __future__ import annotations
 
 import io
+import logging
 import re
 from dataclasses import dataclass, field
+
+logger = logging.getLogger(__name__)
 
 ALLOWED_EXTENSIONS = {"pdf", "docx", "pptx", "ppt", "txt"}
 VIRTUAL_PAGE_CHARS = 3000
@@ -103,6 +106,23 @@ def _from_pdf(data: bytes) -> Document:
     return Document(pages, "p.")
 
 
+def _docx_by_xml(data: bytes) -> list[tuple[str, bool]]:
+    """Lecture de secours : le texte des paragraphes dans word/document.xml, quand python-docx refuse le fichier
+    (documents exportés par Google Docs ou par une application mobile, styles ou relations incomplets)."""
+    import html
+    import zipfile
+
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        xml = archive.read("word/document.xml").decode("utf-8", errors="replace")
+    blocks: list[tuple[str, bool]] = []
+    for paragraph in re.findall(r"<w:p[ >].*?</w:p>", xml, flags=re.DOTALL):
+        heading = bool(re.search(r'<w:pStyle w:val="(?:[Hh]eading|[Tt]itre)', paragraph))
+        paragraph = re.sub(r"<w:tab\s*/>", " ", paragraph)
+        text = "".join(re.findall(r"<w:t(?:\s[^>]*)?>([^<]*)</w:t>", paragraph))
+        blocks.append((html.unescape(text), heading))
+    return blocks
+
+
 def _from_docx(data: bytes) -> Document:
     from docx import Document as Docx
 
@@ -113,7 +133,12 @@ def _from_docx(data: bytes) -> Document:
             for row in table.rows:
                 blocks.append((" | ".join(cell.text.strip() for cell in row.cells), False))
     except Exception as error:
-        raise UnsupportedFile("docx") from error
+        logger.warning("python-docx n'a pas pu lire le fichier (%s : %s), lecture de secours", type(error).__name__, error)
+        try:
+            blocks = _docx_by_xml(data)
+        except Exception as fallback_error:
+            logger.warning("lecture de secours impossible aussi (%s : %s)", type(fallback_error).__name__, fallback_error)
+            raise UnsupportedFile("docx") from error
     return _split_virtual_pages(blocks, "partie")
 
 
