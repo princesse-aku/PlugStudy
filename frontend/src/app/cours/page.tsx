@@ -1,11 +1,14 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { Suspense, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { CourseCard } from "@/components/CourseCard";
 import { CheckIcon } from "@/components/Icons";
 import { useAuth } from "@/lib/auth-context";
+import { backend } from "@/lib/backend";
+import { errorMessage } from "@/lib/detail";
 import { countCourses, filterCourses, type CourseFilter } from "@/lib/courses";
 import { useI18n } from "@/lib/i18n";
 import { useCourses } from "@/lib/use-courses";
@@ -13,7 +16,9 @@ import { useCourses } from "@/lib/use-courses";
 function MesCours() {
   const { user } = useAuth();
   const { t } = useI18n();
-  const { courses, loaded } = useCourses(user?.uid);
+  const { courses: everything, loaded } = useCourses(user?.uid, true);
+  const courses = everything.filter((course) => course.status !== "error");
+  const failed = everything.filter((course) => course.status === "error" && !course.dismissed);
   const added = useSearchParams().get("ajoute") === "1";
   const [filter, setFilter] = useState<CourseFilter>("tous");
 
@@ -56,7 +61,30 @@ function MesCours() {
       </div>
 
       <div className="flex flex-col gap-2.5 px-5 pt-2">
-        {added ? (
+        {failed.map((course) => (
+          <div key={course.id} role="alert" className="flex flex-col gap-2 rounded-[14px] border border-danger bg-card px-3.5 py-3 text-sm leading-snug">
+            <p className="font-bold text-danger">
+              {t("« {name} » n’a pas pu être préparé.", { name: course.name })}
+            </p>
+            <p className="text-ink">{t(errorMessage(course.errorReason).text)}</p>
+            <div className="flex gap-2">
+              <Link href="/cours/ajouter" className="flex min-h-11 items-center rounded-full bg-accent px-4 font-bold text-on-accent">
+                {t("Réessayer")}
+              </Link>
+              <button
+                type="button"
+                className="min-h-11 rounded-full border border-field px-4 font-medium text-ink"
+                onClick={() => {
+                  if (user) void backend.setDocument(["users", user.uid, "courses", course.id], { dismissed: true }, true);
+                }}
+              >
+                {t("Fermer")}
+              </button>
+            </div>
+          </div>
+        ))}
+
+        {added && failed.length === 0 ? (
           <p
             role="status"
             className="flex items-start gap-2.5 rounded-[14px] bg-pale px-3.5 py-3 text-sm leading-snug text-pale2"

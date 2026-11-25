@@ -175,6 +175,9 @@ describe("Cours dont la préparation a échoué", () => {
     wrap(<CoursPage />);
     await waitFor(() => expect(screen.queryByText("Préparation impossible")).toBeNull());
     expect(screen.queryByText("À refaire")).toBeNull();
+    // Un avis clair signale l'échec, avec la raison et de quoi réessayer.
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Réessayer" })).toBeTruthy();
   });
 });
 

@@ -52,6 +52,8 @@ export interface Course {
   /** Étapes de préparation terminées (0 à 4) : lecture, fiche, quiz, plan de révision. Écrit par le backend. */
   prepStep?: number;
   /** Pourquoi la préparation a échoué (status « error ») : écrit par le backend. */
+  /** L'étudiant a fermé l'avis d'échec : le cours ne lui est plus signalé. */
+  dismissed?: boolean;
   errorReason?: "format" | "unreadable" | "empty" | "ai" | "failed" | "upload";
 }
 
