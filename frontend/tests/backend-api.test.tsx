@@ -170,11 +170,11 @@ describe("Cours dont la préparation a échoué", () => {
     expect(errorMessage("unreadable").text).toContain("PDF scanné");
   });
 
-  it("apparaît « À refaire » dans Mes cours", async () => {
+  it("n'apparaît pas dans Mes cours", async () => {
     seed([course({ status: "error", errorReason: "format" })]);
     wrap(<CoursPage />);
-    expect(await screen.findByText("À refaire")).toBeTruthy();
-    expect(screen.getByText("Préparation impossible")).toBeTruthy();
+    await waitFor(() => expect(screen.queryByText("Préparation impossible")).toBeNull());
+    expect(screen.queryByText("À refaire")).toBeNull();
   });
 });
 
