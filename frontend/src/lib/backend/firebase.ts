@@ -97,7 +97,7 @@ function toDocData(snapshot: QueryDocumentSnapshot<DocumentData>): DocData {
   return { ...snapshot.data({ serverTimestamps: "estimate" }), id: snapshot.id };
 }
 
-function toCourse(snapshot: QueryDocumentSnapshot<DocumentData>): Course {
+export function toCourse(snapshot: QueryDocumentSnapshot<DocumentData>): Course {
   const data = snapshot.data({ serverTimestamps: "estimate" });
   const category = CATEGORIES.includes(data.category) ? (data.category as Category) : "Autre";
   return {
@@ -115,6 +115,8 @@ function toCourse(snapshot: QueryDocumentSnapshot<DocumentData>): Course {
     summary: typeof data.summary === "string" ? data.summary : undefined,
     prepStep: typeof data.prepStep === "number" ? data.prepStep : undefined,
     errorReason: typeof data.errorReason === "string" ? (data.errorReason as Course["errorReason"]) : undefined,
+    dismissed: data.dismissed === true ? true : undefined,
+    studyMinutes: typeof data.studyMinutes === "number" ? data.studyMinutes : undefined,
   };
 }
 
