@@ -1,5 +1,6 @@
 import { localeOf, translate, type Lang } from "@/lib/i18n/translate";
-import type { Course, Notion, Plan, PlanSession } from "@/lib/types";
+import { generalQuizQuestions, rankNotions } from "@/lib/revision";
+import type { Course, Notion, Plan, PlanSession, Question } from "@/lib/types";
 
 /**
  * Planning de révision (écrans 22, 23 et 29).
@@ -138,6 +139,12 @@ function chapterNumber(raw: string): number {
   }, 0);
 }
 
+/** Numéro de chapitre lu dans la source d'une notion (« Algorithmique, chap. 2, p. 14 »), 0 s'il n'y en a pas. */
+export function chapterOf(source: string): number {
+  const match = /\b(?:chap|ch)\.\s*(\d+|[IVXLC]+)\b/i.exec(source);
+  return match ? chapterNumber(match[1]) : 0;
+}
+
 export interface CourseUnits {
   unit: PlanSession["unit"];
   /** Numéros à afficher, dans l'ordre croissant. */
@@ -151,8 +158,7 @@ export interface CourseUnits {
 export function courseUnits(notions: Pick<Notion, "source">[]): CourseUnits {
   const chapters = new Set<number>();
   for (const notion of notions) {
-    const match = /\b(?:chap|ch)\.\s*(\d+|[IVXLC]+)\b/i.exec(notion.source);
-    const number = match ? chapterNumber(match[1]) : 0;
+    const number = chapterOf(notion.source);
     if (number > 0) chapters.add(number);
   }
   if (chapters.size > 0) return { unit: "chapter", numbers: [...chapters].sort((a, b) => a - b) };
@@ -294,4 +300,56 @@ export function weekProgress(entries: AgendaEntry[], days: string[]): { done: nu
 export function focusPlan(plans: Plan[], today: string): Plan | null {
   const sorted = [...plans].sort((a, b) => a.examDate.localeCompare(b.examDate));
   return sorted.find((plan) => plan.examDate >= today) ?? sorted[sorted.length - 1] ?? null;
+}
+
+// ---------- Urgence de l'examen et quiz prévus ----------
+
+/**
+ * Urgence U de l'examen, pour la priorité R = U × Σ S(1 − M) des cours à reprendre : 1 sans date ou à plus de 14 jours,
+ * puis elle monte jusqu'à 3 le jour de l'examen ; un examen passé compte moitié moins. Hypothèse de départ à calibrer.
+ */
+export function examUrgency(examDate: string | null | undefined, today: string): number {
+  if (!examDate || !isISODate(examDate)) return 1;
+  const days = daysBetween(today, examDate);
+  if (days < 0) return 0.5;
+  if (days >= 14) return 1;
+  return 1 + (14 - days) / 7;
+}
+
+/** « jeudi 10 déc. » */
+export const weekdayShortDate = (iso: string, lang: Lang): string => format(iso, lang, { weekday: "long", day: "numeric", month: "short" });
+
+/** Les notions d'une unité du planning : un chapitre, ou une partie de quatre notions (dans l'ordre du classement). */
+export function unitNotions(notions: Notion[], unit: PlanSession["unit"], n: number): Notion[] {
+  return unit === "chapter" ? notions.filter((notion) => chapterOf(notion.source) === n) : rankNotions(notions).slice((n - 1) * 4, n * 4);
+}
+
+/** Questions du « quiz n » du planning : celles des notions du chapitre (ou de la partie) n. */
+export const unitQuizQuestions = (questions: Question[], notions: Notion[], unit: PlanSession["unit"], n: number): Question[] =>
+  generalQuizQuestions(questions, unitNotions(notions, unit, n));
+
+export interface PlannedQuiz {
+  session: PlanSession;
+  /** Position dans `plan.sessions` (pour marquer la session comme faite). */
+  index: number;
+}
+
+/**
+ * La session du planning que ce quiz accomplit, s'il en reste une à faire : le « quiz n » d'un chapitre (ou d'une partie),
+ * ou la révision générale pour le quiz général. -1 sinon.
+ */
+export function quizSessionIndex(plan: Plan | null | undefined, unit: { unit: PlanSession["unit"]; n: number } | null): number {
+  return (plan?.sessions ?? []).findIndex((session) =>
+    unit
+      ? session.kind === "quiz" && session.unit === unit.unit && session.from === unit.n && !session.done
+      : session.kind === "general" && !session.done
+  );
+}
+
+/** Les quiz du planning qui restent à faire (quiz de chapitre et révision générale), dans l'ordre des jours. */
+export function plannedQuizzes(plan: Plan | null | undefined): PlannedQuiz[] {
+  return (plan?.sessions ?? [])
+    .map((session, index) => ({ session, index }))
+    .filter(({ session }) => (session.kind === "quiz" || session.kind === "general") && !session.done)
+    .sort((a, b) => a.session.date.localeCompare(b.session.date));
 }

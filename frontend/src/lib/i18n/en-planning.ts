@@ -45,6 +45,11 @@ export const EN_PLANNING: Record<string, string> = {
   "Marquer comme fait": "Mark as done",
   "Marquer comme fait : {session}": "Mark as done: {session}",
 
+  // Quiz prévus (onglet Quiz du cours)
+  "Prévu {when}": "Planned for {when}",
+  "Lancer le quiz {n}": "Start quiz {n}",
+  "Lancer le quiz général": "Start the general quiz",
+
   // Réglages
   "Ton planning": "Your study plan",
   "Deux réglages, une seule fois.": "Two settings, just once.",

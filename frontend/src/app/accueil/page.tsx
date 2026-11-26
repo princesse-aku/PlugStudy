@@ -10,7 +10,7 @@ import { averageProgress, coursesToResume } from "@/lib/courses";
 import { useI18n } from "@/lib/i18n";
 import { firstName } from "@/lib/names";
 import { relativeTime } from "@/lib/time";
-import { useAttempts, useSessions } from "@/lib/data";
+import { useAttempts, useCoursePriorities, useSessions } from "@/lib/data";
 import { useCourses } from "@/lib/use-courses";
 
 function Stat({ value, label, muted, progress }: { value: string; label: string; muted?: boolean; progress?: number }) {
@@ -34,7 +34,8 @@ export default function AccueilPage() {
   const { t, lang } = useI18n();
   const { courses, loaded } = useCourses(user?.uid);
   const empty = loaded && courses.length === 0;
-  const resume = coursesToResume(courses).slice(0, 2);
+  const priorities = useCoursePriorities(user?.uid, courses);
+  const resume = coursesToResume(courses, priorities).slice(0, 2);
   const progress = averageProgress(courses);
   const { attempts } = useAttempts(user?.uid);
   const { sessions } = useSessions(user?.uid);

@@ -4,6 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { router } from "./setup";
 import { AuthProvider } from "@/lib/auth-context";
 import { I18nProvider } from "@/lib/i18n";
+import AccueilPage from "@/app/accueil/page";
+import CoursDetailPage from "@/app/cours/[id]/page";
+import QuizPage from "@/app/cours/[id]/quiz/page";
 import PlanningPage from "@/app/planning/page";
 import ReglagesPage from "@/app/planning/reglages/page";
 import {
@@ -14,16 +17,22 @@ import {
   courseUnits,
   dayMark,
   daysBetween,
+  examUrgency,
   focusPlan,
   monthGrid,
   mondayOf,
+  plannedQuizzes,
+  quizSessionIndex,
   sessionCount,
   sessionCountLabel,
   sessionTitle,
+  unitNotions,
+  unitQuizQuestions,
   weekProgress,
   weekTitle,
 } from "@/lib/planning";
-import type { Plan } from "@/lib/types";
+import { coursesToResume } from "@/lib/courses";
+import type { Course, Notion, Plan, Question } from "@/lib/types";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => router,
@@ -370,5 +379,134 @@ describe("Planning en anglais", () => {
     expect(screen.getByText("Today")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Edit" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Week" })).toBeTruthy();
+  });
+});
+
+// ---------- Priorité R des cours à reprendre, et quiz prévus ----------
+
+const fullNotion = (over: Partial<Notion>): Notion =>
+  ({ id: "n", title: "Notion", excerpt: "x", simple: "y", source: "Algorithmique, chap. 1, p. 3", importance: 0.7, frequency: 0.5, position: 1, mastery: 0, ...over }) as Notion;
+
+const question = (id: string, notionId: string, text: string): Question => ({
+  id,
+  notionId,
+  text,
+  choices: ["Bonne réponse", "Mauvaise A", "Mauvaise B", "Mauvaise C"],
+  correctIndex: 0,
+  explanation: "Parce que le cours le dit.",
+  source: "Algorithmique, chap. 2, p. 8",
+});
+
+describe("Urgence de l'examen et priorité des cours à reprendre", () => {
+  it("monte quand l'examen approche", () => {
+    expect(examUrgency(null, "2026-12-09")).toBe(1);
+    expect(examUrgency("pas une date", "2026-12-09")).toBe(1);
+    expect(examUrgency("2027-03-01", "2026-12-09")).toBe(1);
+    expect(examUrgency("2026-12-23", "2026-12-09")).toBe(1); // dans 14 jours
+    expect(examUrgency("2026-12-16", "2026-12-09")).toBe(2); // dans 7 jours
+    expect(examUrgency("2026-12-09", "2026-12-09")).toBe(3); // aujourd'hui
+    expect(examUrgency("2026-12-08", "2026-12-09")).toBe(0.5); // déjà passé
+  });
+
+  it("classe les cours à reprendre par priorité, puis par révision la plus récente", () => {
+    const base = { description: "", category: "Informatique", fileName: "a.pdf", fileSize: 1, status: "ready", progress: 10, examDate: null, createdAt: 1 } as const;
+    const calm = { ...base, id: "a", name: "Calme", lastStudiedAt: 900 } as Course;
+    const urgent = { ...base, id: "b", name: "Urgent", lastStudiedAt: null } as Course;
+    const equal = { ...base, id: "c", name: "Égal", lastStudiedAt: 500 } as Course;
+    expect(coursesToResume([calm, urgent], { a: 1, b: 2.5 }).map((c) => c.id)).toEqual(["b", "a"]);
+    // Sans priorité connue ou à priorité égale : le plus récemment révisé d'abord (comportement d'avant).
+    expect(coursesToResume([equal, urgent, calm]).map((c) => c.id)).toEqual(["a", "c", "b"]);
+    expect(coursesToResume([equal, calm], { a: 2, c: 2 }).map((c) => c.id)).toEqual(["a", "c"]);
+  });
+
+  it("l'accueil met en tête le cours dont l'examen est proche, même s'il a été révisé moins récemment", async () => {
+    seed({
+      courses: [
+        course({ id: "c1", name: "Algorithmique", lastStudiedAt: Date.now() - 1000 }),
+        course({ id: "c2", name: "Droit", examDate: "2026-12-12", lastStudiedAt: null }),
+      ],
+    });
+    write(`plugstudy:demo:col:users/${UID}/courses/c2/notions`, NOTIONS);
+    wrap(<AccueilPage />);
+    await waitFor(() => {
+      const cards = screen.getAllByRole("link").filter((link) => link.getAttribute("href")?.endsWith("/seance"));
+      expect(cards.map((card) => card.getAttribute("href"))).toEqual(["/cours/c2/seance", "/cours/c1/seance"]);
+    });
+    expect(within(screen.getByText("Commence par ça").closest("a") as HTMLElement).getByText("Droit")).toBeTruthy();
+  });
+});
+
+describe("Quiz prévus", () => {
+  const chapterNotions = [
+    fullNotion({ id: "a1", source: "Algorithmique, chap. 1, p. 3" }),
+    fullNotion({ id: "a2", source: "Algorithmique, chap. 2, p. 8" }),
+    fullNotion({ id: "a3", source: "Algorithmique, chap. 2, p. 9", importance: 0.2, frequency: 0.1, position: 0.3 }),
+  ];
+  const all = [question("q1", "a1", "Q chapitre 1 ?"), question("q2", "a2", "Q chapitre 2 ?"), question("q3", "a3", "Q chapitre 2 bis ?")];
+
+  it("retrouve les notions et les questions d'un chapitre ou d'une partie", () => {
+    expect(unitNotions(chapterNotions, "chapter", 2).map((n) => n.id)).toEqual(["a2", "a3"]);
+    expect(unitQuizQuestions(all, chapterNotions, "chapter", 2).map((q) => q.id).sort()).toEqual(["q2", "q3"]);
+    expect(unitQuizQuestions(all, chapterNotions, "chapter", 9)).toEqual([]);
+    const five = Array.from({ length: 5 }, (_, index) => fullNotion({ id: `p${index}`, importance: 1 - index / 10 }));
+    expect(unitNotions(five, "part", 1)).toHaveLength(4);
+    expect(unitNotions(five, "part", 2).map((n) => n.id)).toEqual(["p4"]);
+  });
+
+  it("liste les quiz à faire et trouve la session qu'un quiz accomplit", () => {
+    const plan = mockPlan(); // quiz 1 fait ; quiz 2 le 10 ; révision générale le 11
+    expect(plannedQuizzes(plan).map((q) => `${q.session.date} ${q.session.kind}`)).toEqual(["2026-12-10 quiz", "2026-12-11 general"]);
+    expect(plannedQuizzes(null)).toEqual([]);
+    expect(quizSessionIndex(plan, { unit: "chapter", n: 2 })).toBe(3);
+    expect(quizSessionIndex(plan, { unit: "chapter", n: 1 })).toBe(-1); // déjà fait
+    expect(quizSessionIndex(plan, null)).toBe(4);
+    expect(quizSessionIndex(null, null)).toBe(-1);
+  });
+
+  it("l'onglet Quiz du cours montre les quiz prévus et lance le prochain", async () => {
+    seed({ plan: mockPlan() });
+    window.history.pushState({}, "", "/?onglet=quiz");
+    wrap(<CoursDetailPage />);
+    const quiz2 = await screen.findByRole("link", { name: /Quiz 2/ });
+    expect(quiz2.getAttribute("href")).toBe("/cours/c1/quiz?chapitre=2");
+    expect(within(quiz2).getByText("Prévu jeudi 10 déc.")).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Révision générale/ }).getAttribute("href")).toBe("/cours/c1/quiz");
+    expect(screen.queryByText(/Tu n’as pas encore fait de quiz/)).toBeNull();
+    expect(screen.getByRole("link", { name: "Lancer le quiz 2" }).getAttribute("href")).toBe("/cours/c1/quiz?chapitre=2");
+  });
+
+  it("le quiz d'un chapitre ne pose que les questions de ce chapitre et accomplit la session prévue", async () => {
+    seed({ plan: mockPlan() });
+    write(`plugstudy:demo:col:users/${UID}/courses/c1/questions`, [
+      question("q1", "n1", "Question du chapitre 1 ?"),
+      question("q2", "n2", "Question du chapitre 2 ?"),
+    ]);
+    window.history.pushState({}, "", "/?chapitre=2");
+    const user = userEvent.setup();
+    wrap(<QuizPage />);
+    expect(await screen.findByText("Quiz 2")).toBeTruthy();
+    expect(screen.getByText("Question 1 sur 1")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Question du chapitre 2 ?" })).toBeTruthy();
+    await user.click(screen.getByText("Bonne réponse"));
+    await user.click(screen.getByRole("button", { name: "Voir mon résultat" }));
+
+    await waitFor(() => expect(router.push).toHaveBeenCalled());
+    await waitFor(() => expect(read(`plugstudy:demo:col:users/${UID}/plans`)[0].sessions[3].done).toBe(true));
+    expect(read(`plugstudy:demo:col:users/${UID}/sessions`)).toHaveLength(1);
+  });
+
+  it("le quiz général accomplit la révision générale du planning", async () => {
+    seed({ plan: mockPlan() });
+    write(`plugstudy:demo:col:users/${UID}/courses/c1/questions`, [question("q1", "n1", "Question 1 ?"), question("q2", "n2", "Question 2 ?")]);
+    const user = userEvent.setup();
+    wrap(<QuizPage />);
+    expect(await screen.findByText("Question 1 sur 2")).toBeTruthy();
+    for (let n = 1; n <= 2; n++) {
+      await screen.findByText(`Question ${n} sur 2`);
+      await user.click(screen.getByText("Bonne réponse"));
+      await user.click(screen.getByRole("button", { name: n === 2 ? "Voir mon résultat" : "Question suivante" }));
+    }
+    await waitFor(() => expect(read(`plugstudy:demo:col:users/${UID}/plans`)[0].sessions[4].done).toBe(true));
+    expect(read(`plugstudy:demo:col:users/${UID}/plans`)[0].sessions[3].done).toBe(false); // le quiz 2 reste à faire
   });
 });

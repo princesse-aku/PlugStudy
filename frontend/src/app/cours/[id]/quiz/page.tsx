@@ -10,7 +10,8 @@ import { CheckIcon, CrossIcon } from "@/components/Icons";
 import { BackHeader, Notice, SourceChip } from "@/components/Revision";
 import { Screen } from "@/components/Screen";
 import { useI18n } from "@/lib/i18n";
-import { loadQuestions, saveQuizAttempt, useNotions } from "@/lib/data";
+import { loadQuestions, markSessionDone, saveQuizAttempt, useNotions, usePlans } from "@/lib/data";
+import { quizSessionIndex, unitQuizQuestions } from "@/lib/planning";
 import { generalQuizQuestions, nextNotionId, notionQuestions } from "@/lib/revision";
 import { useCourseScreen } from "@/lib/use-courses";
 import type { Question, QuizAnswer } from "@/lib/types";
@@ -19,16 +20,22 @@ const LETTERS = ["A", "B", "C", "D", "E", "F"];
 
 /**
  * Écran 20 · Quiz : une question à la fois, avec « Pourquoi ce n'est pas A » et la source.
- * Avec `?notion=`, c'est le quiz de cette notion seulement (celle qu'on vient de réviser) ; sans, le quiz général de fin de cours.
+ * Avec `?notion=`, c'est le quiz de cette notion seulement (celle qu'on vient de réviser) ; avec `?chapitre=n` (ou `?partie=n`),
+ * le quiz du chapitre n prévu au planning ; sans rien, le quiz général de fin de cours.
  */
 function Quiz() {
   const { id } = useParams<{ id: string }>();
   const { t } = useI18n();
   const router = useRouter();
-  const wanted = useSearchParams().get("notion");
+  const params = useSearchParams();
+  const wanted = params.get("notion");
+  const chapter = Number(params.get("chapitre")) || 0;
+  const part = Number(params.get("partie")) || 0;
+  const unit = chapter > 0 ? { unit: "chapter" as const, n: chapter } : part > 0 ? { unit: "part" as const, n: part } : null;
   const state = useCourseScreen(id);
   const uid = state.phase === "ready" ? state.user.uid : undefined;
   const { items: notions, loaded } = useNotions(uid, id);
+  const { plans } = usePlans(uid);
 
   const [questions, setQuestions] = useState<Question[] | null>(null);
   const [index, setIndex] = useState(0);
@@ -43,9 +50,19 @@ function Quiz() {
     if (!uid || !loaded || started.current) return;
     started.current = true;
     loadQuestions(uid, id)
-      .then((all) => setQuestions(wanted ? notionQuestions(all, wanted) : generalQuizQuestions(all, notions)))
+      .then((all) =>
+        setQuestions(
+          wanted
+            ? notionQuestions(all, wanted)
+            : unit
+              ? unitQuizQuestions(all, notions, unit.unit, unit.n)
+              : generalQuizQuestions(all, notions)
+        )
+      )
       .catch(() => setQuestions([]));
-  }, [uid, loaded, id, notions, wanted]);
+    // `unit` est relu à chaque rendu mais ne change pas pendant le quiz : seuls `chapter` et `part` comptent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid, loaded, id, notions, wanted, chapter, part]);
 
   if (state.phase === "waiting") return <Screen />;
   if (state.phase === "missing") {
@@ -59,8 +76,8 @@ function Quiz() {
 
   const { user, course } = state;
   const focus = wanted ? notions.find((notion) => notion.id === wanted) : undefined;
-  const back = focus ? `/cours/${id}/seance?notion=${focus.id}` : `/cours/${id}/seance`;
-  const title = focus ? t("Quiz sur la notion") : t("Quiz général");
+  const back = focus ? `/cours/${id}/seance?notion=${focus.id}` : unit ? `/cours/${id}?onglet=quiz` : `/cours/${id}/seance`;
+  const title = focus ? t("Quiz sur la notion") : unit ? t("Quiz {n}", { n: unit.n }) : t("Quiz général");
 
   if (questions === null) return <Screen />;
   if (questions.length === 0) {
@@ -114,6 +131,12 @@ function Quiz() {
     setError(null);
     try {
       const attemptId = await saveQuizAttempt(user, course, notions, all);
+      if (!focus) {
+        // Le quiz du chapitre (ou le quiz général) accomplit la session prévue au planning : elle passe à « faite ».
+        const plan = plans.find((item) => item.courseId === id);
+        const planned = quizSessionIndex(plan, unit);
+        if (plan && planned >= 0) await markSessionDone(user, plan, planned).catch(() => undefined);
+      }
       router.push(`/cours/${id}/resultat?tentative=${attemptId}${focus ? `&notion=${focus.id}` : ""}`);
     } catch {
       setError(t("Impossible d’enregistrer ton résultat. Vérifie ta connexion et réessaie."));

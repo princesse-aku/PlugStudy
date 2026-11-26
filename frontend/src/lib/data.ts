@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { backend } from "@/lib/backend";
-import { applyQuiz } from "@/lib/revision";
+import { applyQuiz, coursePriority } from "@/lib/revision";
 import { SAMPLE_SUMMARY, buildSampleContent } from "@/lib/sample-content";
-import { buildPlan, todayISO } from "@/lib/planning";
+import { buildPlan, examUrgency, todayISO } from "@/lib/planning";
 import type { AppUser, Attempt, Course, Message, Notion, Plan, Question, QuizAnswer, StudySession } from "@/lib/types";
 
 /** Écoute une collection sous users/{uid}. `loaded` reste false jusqu'à la première réponse. */
@@ -44,6 +44,36 @@ export function useSessions(uid: string | undefined) {
 export function usePlans(uid: string | undefined) {
   const { items, loaded } = useCollection<Plan>(uid ? ["users", uid, "plans"] : null);
   return { plans: items, loaded };
+}
+
+/**
+ * Priorité R = U × Σ S(1 − M) de chaque cours prêt (U : urgence de l'examen, S : score des notions, M : maîtrise), pour
+ * classer les cours à reprendre. Suit les notions de chaque cours en direct ; vide tant qu'elles ne sont pas chargées.
+ */
+export function useCoursePriorities(uid: string | undefined, courses: Course[]): Record<string, number> {
+  const ready = courses.filter((course) => course.status === "ready");
+  const key = uid ? `${uid}|${ready.map((course) => course.id).join(",")}` : "";
+  const [state, setState] = useState<{ key: string; notions: Record<string, Notion[]> }>({ key, notions: {} });
+
+  useEffect(() => {
+    if (!key || !uid) return;
+    const stops = key
+      .split("|")[1]
+      .split(",")
+      .filter(Boolean)
+      .map((courseId) =>
+        backend.watchCollection(["users", uid, "courses", courseId, "notions"], (docs) =>
+          setState((current) => ({ key, notions: { ...(current.key === key ? current.notions : {}), [courseId]: docs as unknown as Notion[] } }))
+        )
+      );
+    return () => stops.forEach((stop) => stop());
+  }, [key, uid]);
+
+  if (state.key !== key) return {};
+  const today = todayISO();
+  return Object.fromEntries(
+    ready.filter((course) => state.notions[course.id]).map((course) => [course.id, coursePriority(state.notions[course.id], examUrgency(course.examDate, today))])
+  );
 }
 
 export function useMessages(uid: string | undefined, courseId: string) {

@@ -21,11 +21,19 @@ export function averageProgress(courses: Course[]): number {
   return Math.round(courses.reduce((total, course) => total + course.progress, 0) / courses.length);
 }
 
-/** Cours à reprendre : prêts et pas terminés ; le plus récemment révisé d'abord, puis les jamais révisés. */
-export function coursesToResume(courses: Course[]): Course[] {
+/**
+ * Cours à reprendre : prêts et pas terminés. Le premier est celui de plus forte priorité R = U × Σ S(1 − M) (voir
+ * `useCoursePriorities`) ; à priorité égale (ou inconnue), le plus récemment révisé d'abord, puis les jamais révisés.
+ */
+export function coursesToResume(courses: Course[], priorities: Record<string, number> = {}): Course[] {
   return courses
     .filter((course) => course.status === "ready" && !isDone(course))
-    .sort((a, b) => (b.lastStudiedAt ?? 0) - (a.lastStudiedAt ?? 0) || b.createdAt - a.createdAt);
+    .sort(
+      (a, b) =>
+        (priorities[b.id] ?? 0) - (priorities[a.id] ?? 0) ||
+        (b.lastStudiedAt ?? 0) - (a.lastStudiedAt ?? 0) ||
+        b.createdAt - a.createdAt
+    );
 }
 
 /** Nom proposé d'après le fichier : « structures_de_donnees.pdf » devient « Structures de donnees ». */

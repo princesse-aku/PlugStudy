@@ -9,7 +9,8 @@ import { DemoBanner } from "@/components/DemoBanner";
 import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, MessageIcon, SendIcon } from "@/components/Icons";
 import { ImportanceBadge, Notice } from "@/components/Revision";
 import { Screen } from "@/components/Screen";
-import { useAttempts, useMessages, useNotions, seedSampleContent } from "@/lib/data";
+import { useAttempts, useMessages, useNotions, usePlans, seedSampleContent } from "@/lib/data";
+import { plannedQuizzes, sessionTitle, weekdayShortDate, type PlannedQuiz } from "@/lib/planning";
 import { averageQuizScore, courseSubtitle, errorMessage, notionsToStrengthen, prepSteps, recentConversations, starterQuestions } from "@/lib/detail";
 import { useI18n } from "@/lib/i18n";
 import { importanceOf, rankNotions } from "@/lib/revision";
@@ -38,6 +39,7 @@ function Detail() {
   const uid = state.phase === "ready" ? state.user.uid : undefined;
   const { items: notions } = useNotions(uid, id);
   const { attempts: allAttempts } = useAttempts(uid);
+  const { plans } = usePlans(uid);
   const { messages } = useMessages(uid, id);
   const [question, setQuestion] = useState("");
   const [seeding, setSeeding] = useState(false);
@@ -63,6 +65,11 @@ function Detail() {
   const waiting = preparing || failed; // pas de fiche, de quiz ni d'IA tant que le cours n'est pas prêt
   const attempts = allAttempts.filter((attempt) => attempt.courseId === id);
   const ranked = rankNotions(notions);
+  // Les quiz prévus au planning, du plus proche au plus lointain ; le premier est celui que « Lancer » démarre.
+  const planned = plannedQuizzes(plans.find((plan) => plan.courseId === id));
+  const quizHref = ({ session }: PlannedQuiz) =>
+    session.kind === "quiz" ? `/cours/${id}/quiz?${session.unit === "chapter" ? "chapitre" : "partie"}=${session.from}` : `/cours/${id}/quiz`;
+  const nextQuiz = planned[0];
 
   const go = (name: Tab) => `/cours/${id}${name === "fiche" ? "" : `?onglet=${name}`}`;
 
@@ -244,7 +251,7 @@ function Detail() {
             </div>
 
             <h2 className="font-display text-lg font-bold">{t("Mes quiz")}</h2>
-            {attempts.length === 0 ? (
+            {attempts.length === 0 && planned.length === 0 ? (
               <Notice>{t("Tu n’as pas encore fait de quiz. Lance le premier quand tu veux.")}</Notice>
             ) : (
               <ul className="flex flex-col gap-2.5">
@@ -262,6 +269,20 @@ function Detail() {
                         <CheckIcon size={16} />
                         {attempt.score}/{attempt.total}
                       </span>
+                    </Link>
+                  </li>
+                ))}
+                {planned.map((quiz) => (
+                  <li key={`prevu-${quiz.index}`}>
+                    <Link
+                      href={quizHref(quiz)}
+                      className="flex min-h-[60px] items-center justify-between gap-2.5 rounded-[14px] border border-line bg-card px-3.5 py-3"
+                    >
+                      <span className="flex flex-col gap-0.5">
+                        <span className="text-base font-semibold">{sessionTitle(quiz.session, lang)}</span>
+                        <span className="text-[13px] text-muted">{t("Prévu {when}", { when: weekdayShortDate(quiz.session.date, lang) })}</span>
+                      </span>
+                      <span className="text-[15px] font-bold text-muted">{t("Prévu")}</span>
                     </Link>
                   </li>
                 ))}
@@ -366,8 +387,12 @@ function Detail() {
               {t("Réviser ce cours")}
             </Button>
           ) : tab === "quiz" ? (
-            <Link href={`/cours/${id}/quiz`} className={cta}>
-              {t("Lancer un quiz")}
+            <Link href={nextQuiz ? quizHref(nextQuiz) : `/cours/${id}/quiz`} className={cta}>
+              {!nextQuiz
+                ? t("Lancer un quiz")
+                : nextQuiz.session.kind === "quiz"
+                  ? t("Lancer le quiz {n}", { n: nextQuiz.session.from })
+                  : t("Lancer le quiz général")}
             </Link>
           ) : (
             <Link href={`/cours/${id}/seance`} className={cta}>
