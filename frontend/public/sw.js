@@ -2,7 +2,7 @@
  * - pages visitées : réseau d'abord, copie en cache si le réseau échoue, sinon /offline.html
  * - fichiers /_next/static, icônes, logo : cache d'abord (les noms changent à chaque version)
  * Les appels à Firebase (autre domaine) ne passent jamais par ici. */
-const VERSION = "plugstudy-v1";
+const VERSION = "plugstudy-v2";
 const PAGES = `${VERSION}-pages`;
 const ASSETS = `${VERSION}-assets`;
 const OFFLINE_URL = "/offline.html";

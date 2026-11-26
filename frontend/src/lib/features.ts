@@ -10,8 +10,8 @@ export const features = {
   assistant: false,
   /** Page Suivi (écrans 24 et 30) et sa mention dans le résultat du quiz. */
   suivi: false,
-  /** Planning (écrans 22, 23, 29). Pas encore construit. */
-  planning: false,
+  /** Planning (écrans 22, 23, 29) : réglages, calendrier du mois, vue Semaine. */
+  planning: true,
   /** « Changer la photo » dans le profil (demande un stockage de fichiers). */
   profilePhoto: false,
   /** « Supprimer mon compte » (écran 31, pas encore construit). */

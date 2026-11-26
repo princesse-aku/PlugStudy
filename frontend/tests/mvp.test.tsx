@@ -45,11 +45,11 @@ function seed(opts: { courses?: boolean } = {}) {
 beforeEach(() => window.history.pushState({}, "", "/"));
 
 describe("Réglages du MVP", () => {
-  it("cache tout ce qui n'est pas dans le MVP", () => {
+  it("ne cache que ce qui n'est pas encore dans le produit (le Planning est maintenant visible)", () => {
     expect(features).toEqual({
       assistant: false,
       suivi: false,
-      planning: false,
+      planning: true,
       profilePhoto: false,
       deleteAccount: false,
       typicalCourses: false,
@@ -85,11 +85,11 @@ describe("Démarrage sans aucun cours", () => {
 });
 
 describe("Navigation du MVP", () => {
-  it("la barre du bas ne montre que Accueil, Cours et Profil", async () => {
+  it("la barre du bas montre Accueil, Cours, Planning et Profil", async () => {
     seed();
     wrap(<CoursPage />);
     const nav = await screen.findByRole("navigation", { name: "Navigation principale" });
-    expect(within(nav).getAllByRole("link").map((link) => link.textContent)).toEqual(["Accueil", "Cours", "Profil"]);
+    expect(within(nav).getAllByRole("link").map((link) => link.textContent)).toEqual(["Accueil", "Cours", "Planning", "Profil"]);
   });
 
   it("le détail du cours n'a que les onglets Fiche et Quiz", async () => {

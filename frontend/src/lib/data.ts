@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { backend } from "@/lib/backend";
 import { applyQuiz } from "@/lib/revision";
 import { SAMPLE_SUMMARY, buildSampleContent } from "@/lib/sample-content";
-import type { AppUser, Attempt, Course, Message, Notion, Question, QuizAnswer, StudySession } from "@/lib/types";
+import { buildPlan, todayISO } from "@/lib/planning";
+import type { AppUser, Attempt, Course, Message, Notion, Plan, Question, QuizAnswer, StudySession } from "@/lib/types";
 
 /** Écoute une collection sous users/{uid}. `loaded` reste false jusqu'à la première réponse. */
 function useCollection<T>(path: string[] | null): { items: T[]; loaded: boolean } {
@@ -38,6 +39,11 @@ export function useAttempts(uid: string | undefined) {
 export function useSessions(uid: string | undefined) {
   const { items, loaded } = useCollection<StudySession>(uid ? ["users", uid, "sessions"] : null);
   return { sessions: items, loaded };
+}
+
+export function usePlans(uid: string | undefined) {
+  const { items, loaded } = useCollection<Plan>(uid ? ["users", uid, "plans"] : null);
+  return { plans: items, loaded };
 }
 
 export function useMessages(uid: string | undefined, courseId: string) {
@@ -118,4 +124,36 @@ export async function saveReport(user: AppUser, report: { courseId: string; noti
   if (report.notionId) data.notionId = report.notionId;
   if (report.messageId) data.messageId = report.messageId;
   await backend.addDocument(["users", user.uid, "reports"], data);
+}
+
+/**
+ * Enregistre le planning d'un cours : la date d'examen et le temps par jour sur le cours, puis le découpage en sessions
+ * (un document users/{uid}/plans/{courseId}, remplacé en entier). Les jours passés et les sessions déjà faites sont gardés.
+ */
+export async function savePlan(
+  user: AppUser,
+  course: Course,
+  settings: { examDate: string; minutes: number },
+  previous?: Plan | null
+): Promise<Plan> {
+  const notions = (await backend.listDocuments(["users", user.uid, "courses", course.id, "notions"])) as unknown as Notion[];
+  const plan = buildPlan(course, notions, settings, todayISO(), previous);
+  const { id, ...fields } = plan;
+  void id;
+  await backend.setDocument(["users", user.uid, "plans", course.id], fields);
+  await backend.setDocument(["users", user.uid, "courses", course.id], { examDate: settings.examDate, studyMinutes: settings.minutes }, true);
+  return plan;
+}
+
+/** Marque une session du planning comme faite : elle compte dans le temps de révision du Suivi. */
+export async function markSessionDone(user: AppUser, plan: Plan, index: number): Promise<void> {
+  const session = plan.sessions[index];
+  if (!session || session.done) return;
+  const sessions = plan.sessions.map((item, position) => (position === index ? { ...item, done: true } : item));
+  const { id, ...fields } = { ...plan, sessions };
+  void id;
+  await backend.setDocument(["users", user.uid, "plans", plan.courseId], fields);
+  const now = Date.now();
+  await backend.addDocument(["users", user.uid, "sessions"], { courseId: plan.courseId, notionId: "", minutes: session.minutes, at: now });
+  await backend.setDocument(["users", user.uid, "courses", plan.courseId], { lastStudiedAt: now }, true);
 }

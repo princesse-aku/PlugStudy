@@ -9,7 +9,6 @@ const SRC = join(process.cwd(), "src");
 /** Fonctions cachées dans le MVP (voir src/lib/features.ts) : leurs textes ne sont pas encore traduits. */
 const SKIP = [
   "app/suivi/page.tsx",
-  "app/planning/page.tsx",
   "app/cours/[id]/assistant/page.tsx",
   "app/profil/suppression/page.tsx",
   "components/ComingSoon.tsx",

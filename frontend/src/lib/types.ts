@@ -45,6 +45,8 @@ export interface Course {
   progress: number;
   /** Date d'examen au format AAAA-MM-JJ, ou null. */
   examDate: string | null;
+  /** Temps de révision par jour choisi dans le Planning (30, 60 ou 120 minutes). */
+  studyMinutes?: number;
   createdAt: number;
   lastStudiedAt: number | null;
   /** Résumé du cours généré par l'IA (onglet Fiche). Écrit par le backend. */
@@ -122,4 +124,30 @@ export interface Message {
   /** Source citée par une réponse de l'assistant. */
   source?: string;
   at: number;
+}
+
+/** Une session de révision du planning : un jour, un contenu (chapitre, quiz, révision), une durée. */
+export interface PlanSession {
+  /** AAAA-MM-JJ. */
+  date: string;
+  kind: "chapter" | "quiz" | "review" | "general";
+  /** « chapter » : les chapitres du cours ; « part » : des parties de quatre notions quand le cours n'a pas de chapitres. */
+  unit: "chapter" | "part";
+  /** Numéros de l'unité concernée (de `from` à `to` ; 0 pour la révision générale). */
+  from: number;
+  to: number;
+  minutes: number;
+  done: boolean;
+}
+
+/** Planning d'un cours (users/{uid}/plans/{courseId}) : le découpage du cours en sessions jusqu'à l'examen. */
+export interface Plan {
+  id: string;
+  courseId: string;
+  courseName: string;
+  /** AAAA-MM-JJ. */
+  examDate: string;
+  minutes: number;
+  createdAt: number;
+  sessions: PlanSession[];
 }
