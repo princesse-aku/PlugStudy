@@ -227,10 +227,16 @@ class RawQuestion(BaseModel):
         return cleaned
 
 
+QUESTIONS_PER_NOTION = 3  # le quiz d'une notion : 3 questions qui testent des aspects différents
+QUESTION_BATCH = 3  # notions traitées par appel à l'IA (les appels partent en parallèle)
+
+
 def question_system(language: str = "fr") -> str:
     return (
         "Tu écris des questions à choix multiples (4 choix, une seule bonne réponse) pour tester la compréhension "
-        "d'un étudiant. " + safety(language) + " Une question par notion donnée, fondée sur l'extrait fourni. "
+        "d'un étudiant. " + safety(language) + f" Pour chaque notion donnée, écris {QUESTIONS_PER_NOTION} questions "
+        "DIFFÉRENTES, fondées sur l'extrait fourni : elles testent des aspects différents de la notion (définition, "
+        "exemple, confusion fréquente). Ne parle que de la notion concernée. "
         'Format : {"questions": [{"notion": "identifiant de la notion", "text": "question", '
         '"choices": ["...", "...", "...", "..."], "correct": 0 à 3, '
         '"explanation": "pourquoi la bonne réponse est juste et quelle confusion mène aux autres choix, sans citer de lettre"}]}. '
@@ -241,39 +247,40 @@ def question_system(language: str = "fr") -> str:
 QUESTION_SYSTEM = question_system("fr")
 
 
-def generate_questions(
-    ai: AIClient, notions: list[BuiltNotion], doc: Document, settings: Settings, language: str = "fr"
+def _questions_for_batch(
+    ai: AIClient, batch: list[BuiltNotion], doc: Document, language: str
 ) -> list[tuple[str, dict[str, Any]]]:
-    chosen = notions[: settings.max_questions]
-    if not chosen:
-        return []
     blocks = []
-    for notion in chosen:
+    for notion in batch:
         context = page_text(doc, notion.page)[:1500]
         blocks.append(f"Notion {notion.id} : {notion.data['title']}\nExtrait : {notion.data['excerpt']}\nContexte : {context}")
-    answer = ai.complete_json(role="strong", system=question_system(language), user=_wrap("\n\n".join(blocks)), max_tokens=3000)
+    answer = ai.complete_json(role="strong", system=question_system(language), user=_wrap("\n\n".join(blocks)), max_tokens=3500)
     items = answer.get("questions")
     if not isinstance(items, list):
         return []
-    by_id = {n.id: n for n in chosen}
+    by_id = {n.id: n for n in batch}
     result: list[tuple[str, dict[str, Any]]] = []
-    seen: set[str] = set()
+    texts: dict[str, set[str]] = {}
     for item in items:
         try:
             raw = RawQuestion.model_validate(item)
         except ValidationError:
             continue
         notion = by_id.get(raw.notion)
-        if notion is None or raw.notion in seen:
+        if notion is None:
             continue
-        seen.add(raw.notion)
+        seen = texts.setdefault(raw.notion, set())
+        key = normalize(raw.text)
+        if len(seen) >= QUESTIONS_PER_NOTION or key in seen:
+            continue
+        seen.add(key)
         # Les modèles placent souvent la bonne réponse au même endroit : on mélange (de façon reproductible).
         order = list(range(4))
         random.Random(f"{raw.notion}:{raw.text}").shuffle(order)
         choices = [raw.choices[i] for i in order]
         result.append(
             (
-                f"q-{raw.notion}",
+                f"q-{raw.notion}-{len(seen)}",
                 {
                     "notionId": raw.notion,
                     "text": raw.text,
@@ -284,6 +291,32 @@ def generate_questions(
                 },
             )
         )
+    return result
+
+
+def generate_questions(
+    ai: AIClient, notions: list[BuiltNotion], doc: Document, settings: Settings, language: str = "fr"
+) -> list[tuple[str, dict[str, Any]]]:
+    """Quiz de chaque notion (les mieux classées d'abord) : jusqu'à QUESTIONS_PER_NOTION questions par notion."""
+    chosen = notions[: settings.max_questions]
+    if not chosen:
+        return []
+    batches = [chosen[i : i + QUESTION_BATCH] for i in range(0, len(chosen), QUESTION_BATCH)]
+    result: list[tuple[str, dict[str, Any]]] = []
+    errors: list[AIError] = []
+
+    def run(batch: list[BuiltNotion]) -> list[tuple[str, dict[str, Any]]]:
+        try:
+            return _questions_for_batch(ai, batch, doc, language)
+        except AIError as error:
+            errors.append(error)
+            return []
+
+    with ThreadPoolExecutor(max_workers=len(batches)) as pool:
+        for found in pool.map(run, batches):
+            result.extend(found)
+    if not result and errors:
+        raise errors[0]  # tous les lots ont échoué : le pipeline réessaie
     return result
 
 

@@ -40,7 +40,9 @@ class TestPipeline:
     def test_ecrit_quiz_et_passages(self, store, settings):
         run(store, settings)
         questions = store.list(course_path(UID, COURSE_ID, "questions"))
-        assert len(questions) == 3
+        assert len(questions) == 9  # 3 notions × 3 questions : chaque notion a son quiz
+        for notion_id in ("n01", "n02", "n03"):
+            assert len([q for q in questions if q["notionId"] == notion_id]) == 3
         for q in questions:
             assert len(q["choices"]) == 4 and q["choices"][q["correctIndex"]] == "Bonne réponse"
             assert q["source"].startswith("Algorithmique")
@@ -181,7 +183,7 @@ class TestGeneration:
                 return super().complete_json(**kw)
 
         result = generate_questions(Bad(), built, doc, settings)
-        assert [qid for qid, _ in result] == ["q-n01"]
+        assert [qid for qid, _ in result] == ["q-n01-1"]
         data = result[0][1]
         assert data["choices"][data["correctIndex"]] == "c3"  # le mélange garde la bonne réponse
 
@@ -377,7 +379,7 @@ class TestQuizRetries:
         ai = Flaky()
         course = run(store, settings, ai=ai)
         assert course["status"] == "ready" and ai.asked == 2
-        assert len(store.list(course_path(UID, COURSE_ID, "questions"))) == 3
+        assert len(store.list(course_path(UID, COURSE_ID, "questions"))) == 9
 
     def test_abandonne_apres_trois_essais_sans_bloquer_le_cours(self, store, settings):
         class NoQuiz(FakeAI):
@@ -475,3 +477,70 @@ class TestLanguageApi:
         assert upload(client, language="en").status_code == 202
         body = client.post(f"/courses/{COURSE_ID}/assistant", json={"question": "Who won the football world cup?"}).json()
         assert body["text"].startswith("I can't find that")
+
+
+class TestQuizParNotion:
+    """Chaque notion a son propre quiz : jusqu'à 3 questions différentes, sur cette notion seulement."""
+
+    def built(self, settings, count=3):
+        doc = extract_document("c.txt", COURSE_TEXT.encode())
+        raw = extract_raw_notions(FakeAI(), doc, settings)
+        built = build_notions(raw, doc, page_infos(doc), "Algorithmique", settings)
+        return doc, (built * 3)[:count] if count > len(built) else built[:count]
+
+    def test_trois_questions_par_notion_avec_des_identifiants_distincts(self, settings):
+        doc, built = self.built(settings)
+        result = generate_questions(FakeAI(), built, doc, settings)
+        ids = [qid for qid, _ in result]
+        assert len(ids) == len(set(ids)) == 9
+        assert ids[:3] == ["q-n01-1", "q-n01-2", "q-n01-3"]
+        for qid, data in result:
+            assert qid.startswith(f"q-{data['notionId']}-")
+
+    def test_pas_plus_de_trois_questions_ni_de_doublons(self, settings):
+        doc, built = self.built(settings, 1)
+
+        class Verbose(FakeAI):
+            def complete_json(self, **kw):
+                if kw["system"].startswith("Tu écris des questions"):
+                    one = {"notion": "n01", "choices": ["a1", "b2", "c3", "d4"], "correct": 0, "explanation": "Une explication suffisamment longue."}
+                    return {"questions": [
+                        {**one, "text": "Première question sur la notion ?"},
+                        {**one, "text": "Première question sur la notion ?"},  # doublon
+                        {**one, "text": "Deuxième question sur la notion ?"},
+                        {**one, "text": "Troisième question sur la notion ?"},
+                        {**one, "text": "Quatrième question sur la notion ?"},  # au-delà de 3
+                    ]}
+                return super().complete_json(**kw)
+
+        result = generate_questions(Verbose(), built, doc, settings)
+        assert [qid for qid, _ in result] == ["q-n01-1", "q-n01-2", "q-n01-3"]
+
+    def test_plusieurs_lots_en_parallele(self, settings):
+        doc, built = self.built(settings, 3)
+        ai = FakeAI()
+        small = settings.model_copy(update={"max_questions": 8})
+        many = [type(built[0])(**{**built[0].__dict__, "id": f"n{i:02d}"}) for i in range(1, 8)]
+        result = generate_questions(ai, many, doc, small)
+        calls = [c for c in ai.calls if c[1].startswith("Tu écris des questions")]
+        assert len(calls) == 3  # 7 notions, 3 par lot
+        assert len(result) == 21
+
+    def test_un_lot_en_panne_ne_perd_pas_les_autres(self, settings):
+        doc, built = self.built(settings, 3)
+        many = [type(built[0])(**{**built[0].__dict__, "id": f"n{i:02d}"}) for i in range(1, 7)]
+
+        class OneBatchDown(FakeAI):
+            def complete_json(self, **kw):
+                if kw["system"].startswith("Tu écris des questions") and "Notion n04" in kw["user"]:
+                    raise AIError("panne")
+                return super().complete_json(**kw)
+
+        small = settings.model_copy(update={"max_questions": 8})
+        result = generate_questions(OneBatchDown(), many, doc, small)
+        assert {data["notionId"] for _, data in result} == {"n01", "n02", "n03"}
+
+    def test_tous_les_lots_en_panne_leve_l_erreur(self, settings):
+        doc, built = self.built(settings, 3)
+        with pytest.raises(AIError):
+            generate_questions(FakeAI(fail=True), built, doc, settings)

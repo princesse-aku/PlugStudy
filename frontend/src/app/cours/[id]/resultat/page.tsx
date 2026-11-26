@@ -7,10 +7,10 @@ import { DemoBanner } from "@/components/DemoBanner";
 import { CheckIcon, CrossIcon } from "@/components/Icons";
 import { BackHeader, Notice, Ring, SourceChip } from "@/components/Revision";
 import { Screen } from "@/components/Screen";
-import { useAttempts } from "@/lib/data";
+import { useAttempts, useNotions } from "@/lib/data";
 import { features } from "@/lib/features";
 import { useI18n } from "@/lib/i18n";
-import { resultTitle, scorePercent, wrongAnswers } from "@/lib/revision";
+import { nextNotionId, resultTitle, scorePercent, wrongAnswers } from "@/lib/revision";
 import { useCourseScreen } from "@/lib/use-courses";
 
 const linkPrimary =
@@ -21,9 +21,13 @@ const linkSecondary =
 function Resultat() {
   const { id } = useParams<{ id: string }>();
   const { t, lang } = useI18n();
-  const tentative = useSearchParams().get("tentative");
+  const params = useSearchParams();
+  const tentative = params.get("tentative");
+  const notionId = params.get("notion"); // présent quand on vient du quiz d'une notion
   const state = useCourseScreen(id);
-  const { attempts, loaded } = useAttempts(state.phase === "ready" ? state.user.uid : undefined);
+  const uid = state.phase === "ready" ? state.user.uid : undefined;
+  const { attempts, loaded } = useAttempts(uid);
+  const { items: notions } = useNotions(uid, id);
 
   if (state.phase === "waiting" || !loaded) return <Screen />;
   const attempt = attempts.find((item) => item.id === tentative && item.courseId === id);
@@ -40,14 +44,22 @@ function Resultat() {
   const percent = scorePercent(attempt.score, attempt.total);
   const wrong = wrongAnswers(attempt.answers);
   const first = wrong[0];
+  const next = notionId ? nextNotionId(notions, notionId) : null;
+  // Les boutons, dans l'ordre : revoir ce qui a été raté, passer à la notion suivante, terminer. Le premier est mis en avant.
+  const actions: { href: string; label: string }[] = [];
+  if (first) actions.push({ href: `/cours/${id}/seance?notion=${first.notionId}`, label: t("Revoir la notion") });
+  if (next) actions.push({ href: `/cours/${id}/seance?notion=${next}`, label: t("Notion suivante") });
+  // Toutes les notions sont faites : le quiz général, avec les questions de tout le cours, vient en dernier.
+  else if (notionId) actions.push({ href: `/cours/${id}/quiz`, label: t("Passer au quiz général") });
+  actions.push({ href: "/accueil", label: t("Terminer") });
 
   return (
     <Screen>
       <DemoBanner />
       <BackHeader
-        href={`/cours/${id}/quiz`}
+        href={notionId ? `/cours/${id}/quiz?notion=${notionId}` : `/cours/${id}/quiz`}
         title={t("Résultat du quiz")}
-        subtitle={`${attempt.courseName} · ${t("Quiz de fin de séance")}`}
+        subtitle={`${attempt.courseName} · ${notionId && attempt.answers[0] ? attempt.answers[0].notionTitle : t("Quiz général")}`}
       />
 
       <div className="flex flex-1 flex-col gap-3 px-5 pt-2">
@@ -109,14 +121,11 @@ function Resultat() {
       </div>
 
       <div className="flex flex-col gap-2 px-5 pb-6 pt-2.5">
-        {first ? (
-          <Link href={`/cours/${id}/seance?notion=${first.notionId}`} className={linkPrimary}>
-            {t("Revoir la notion")}
+        {actions.map((action, index) => (
+          <Link key={action.label} href={action.href} className={index === 0 ? linkPrimary : linkSecondary}>
+            {action.label}
           </Link>
-        ) : null}
-        <Link href="/accueil" className={first ? linkSecondary : linkPrimary}>
-          {t("Terminer")}
-        </Link>
+        ))}
       </div>
     </Screen>
   );

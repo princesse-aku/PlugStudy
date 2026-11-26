@@ -50,20 +50,37 @@ export function nextMastery(mastery: number, correct: boolean): number {
   return correct ? Math.min(1, mastery + 0.5) : Math.max(0, mastery - 0.25);
 }
 
-export const QUIZ_LENGTH = 4;
+export const QUESTIONS_PER_NOTION = 3;
 
-/** Questions du quiz de fin de séance : celles des notions de la séance, les moins maîtrisées d'abord. */
-export function pickQuizQuestions(questions: Question[], notions: Notion[], length = QUIZ_LENGTH): Question[] {
-  const byId = new Map(notions.map((notion) => [notion.id, notion]));
-  const inSession = new Set(sessionNotions(notions).map((notion) => notion.id));
-  return [...questions]
-    .filter((question) => byId.has(question.notionId))
-    .sort((a, b) => {
-      const sessionDelta = Number(inSession.has(b.notionId)) - Number(inSession.has(a.notionId));
-      if (sessionDelta !== 0) return sessionDelta;
-      return (byId.get(a.notionId)?.mastery ?? 0) - (byId.get(b.notionId)?.mastery ?? 0);
-    })
+/** Quiz d'une notion : ses propres questions seulement (3 au plus, dans l'ordre de leur création), jamais celles du reste du cours. */
+export function notionQuestions(questions: Question[], notionId: string, length = QUESTIONS_PER_NOTION): Question[] {
+  return questions
+    .filter((question) => question.notionId === notionId)
+    .sort((a, b) => a.id.localeCompare(b.id, "fr", { numeric: true }))
     .slice(0, length);
+}
+
+/** Notion à réviser après celle-ci dans la séance (même ordre que la séance) ; null quand c'était la dernière. */
+export function nextNotionId(notions: Notion[], currentId: string): string | null {
+  const session = sessionNotions(notions);
+  const index = session.findIndex((notion) => notion.id === currentId);
+  return index >= 0 && index < session.length - 1 ? session[index + 1].id : null;
+}
+
+export const GENERAL_PER_NOTION = 2;
+export const GENERAL_MAX_QUESTIONS = 12;
+
+/**
+ * Quiz général de fin de cours : les questions de toutes les notions, une question de chaque notion d'abord (les mieux
+ * classées en tête), puis une seconde par notion tant que la limite n'est pas atteinte.
+ */
+export function generalQuizQuestions(questions: Question[], notions: Notion[]): Question[] {
+  const lists = rankNotions(notions).map((notion) => notionQuestions(questions, notion.id, GENERAL_PER_NOTION));
+  const picked: Question[] = [];
+  for (let round = 0; round < GENERAL_PER_NOTION; round++) {
+    for (const list of lists) if (list[round]) picked.push(list[round]);
+  }
+  return picked.slice(0, GENERAL_MAX_QUESTIONS);
 }
 
 export function scorePercent(score: number, total: number): number {

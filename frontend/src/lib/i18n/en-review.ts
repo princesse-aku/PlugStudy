@@ -37,6 +37,11 @@ export const EN_REVIEW: Record<string, string> = {
 
   // Quiz
   "Quiz de fin de séance": "End-of-session quiz",
+  "Quiz sur la notion": "Key concept quiz",
+  "Quiz général": "General quiz",
+  "Passer au quiz général": "Take the general quiz",
+  "Cette notion n’a pas encore de questions.": "This key concept doesn’t have questions yet.",
+  "Notion suivante": "Next key concept",
   "Le quiz de ce cours n’est pas encore prêt.": "The quiz for this course isn’t ready yet.",
   "Impossible d’enregistrer ton résultat. Vérifie ta connexion et réessaie.": "Couldn’t save your result. Check your connection and try again.",
   "Question {n} sur {total}": "Question {n} of {total}",

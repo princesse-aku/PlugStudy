@@ -14,10 +14,12 @@ import { dailyMinutes, formatMinutes, totalMinutes, weeklyMinutes } from "@/lib/
 import {
   answerFromCourse,
   courseProgress,
+  generalQuizQuestions,
   importanceOf,
   nextMastery,
+  nextNotionId,
+  notionQuestions,
   notionScore,
-  pickQuizQuestions,
   progressMessage,
   resultTitle,
   sessionNotions,
@@ -102,11 +104,11 @@ describe("Règles de révision", () => {
     expect(nextMastery(0, false)).toBe(0);
   });
 
-  it("choisit 4 questions, d'abord celles des notions de la séance", () => {
-    const picked = pickQuizQuestions(questions, notions);
-    expect(picked).toHaveLength(4);
-    const inSession = new Set(sessionNotions(notions).map((n) => n.id));
-    expect(picked.every((q) => inSession.has(q.notionId))).toBe(true);
+  it("le quiz général prend des questions de chaque notion, les mieux classées d'abord", () => {
+    const picked = generalQuizQuestions(questions, notions);
+    expect(new Set(picked.map((q) => q.notionId))).toEqual(new Set(questions.map((q) => q.notionId)));
+    expect(picked[0].notionId).toBe(sessionNotions(notions)[0].id);
+    expect(picked.length).toBeLessThanOrEqual(12);
   });
 
   it("donne les messages de résultat et de suivi", () => {
@@ -220,43 +222,37 @@ describe("Séance de révision (écran 19)", () => {
 });
 
 describe("Quiz (écran 20) puis résultat (écran 26)", () => {
-  it("enregistre le résultat, met à jour la maîtrise et la progression", async () => {
+  it("le quiz général enregistre le résultat, met à jour la maîtrise et la progression", async () => {
     seed();
     const user = userEvent.setup();
     wrap(<QuizPage />);
-    expect(await screen.findByText("Question 1 sur 4")).toBeTruthy();
+    const asked = generalQuizQuestions(questions, notions);
+    expect(await screen.findByText(`Question 1 sur ${asked.length}`)).toBeTruthy();
+    expect(screen.getByText("Quiz général")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Choisis une réponse" }).hasAttribute("disabled")).toBe(true);
 
-    // Question 1 : une mauvaise réponse (A), avec l'explication « Pourquoi ce n'est pas A ».
-    await user.click(screen.getByText("Le nombre de lignes du code"));
-    expect(await screen.findByText("Pourquoi ce n’est pas A")).toBeTruthy();
-    expect(screen.getByText("Ta réponse")).toBeTruthy();
-    expect(screen.getByText("Bonne réponse")).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: "Question suivante" }));
-
-    // Questions 2 à 4 : les bonnes réponses (B).
-    const good = [
-      "Un cas de base qui arrête les appels",
-      "Tant qu’une condition est vraie",
-      "Les valeurs qu’elle peut contenir",
-    ];
-    for (const [index, choice] of good.entries()) {
-      expect(await screen.findByText(`Question ${index + 2} sur 4`)).toBeTruthy();
+    for (const [index, question] of asked.entries()) {
+      expect(await screen.findByText(`Question ${index + 1} sur ${asked.length}`)).toBeTruthy();
+      expect(screen.getByRole("heading", { name: question.text })).toBeTruthy();
+      // La première question : une mauvaise réponse, avec « Pourquoi ce n'est pas … » ; les autres : la bonne.
+      const choice = index === 0 ? question.choices[(question.correctIndex + 1) % question.choices.length] : question.choices[question.correctIndex];
       await user.click(screen.getByText(choice));
-      const last = index === good.length - 1;
-      await user.click(screen.getByRole("button", { name: last ? "Voir mon résultat" : "Question suivante" }));
+      if (index === 0) {
+        expect(await screen.findByText(/Pourquoi ce n’est pas/)).toBeTruthy();
+        expect(screen.getByText("Ta réponse")).toBeTruthy();
+      }
+      await user.click(screen.getByRole("button", { name: index === asked.length - 1 ? "Voir mon résultat" : "Question suivante" }));
     }
 
     await waitFor(() => expect(router.push).toHaveBeenCalled());
-    const target = router.push.mock.calls[0][0] as string;
-    expect(target).toMatch(/^\/cours\/c1\/resultat\?tentative=/);
+    expect(router.push.mock.calls[0][0]).toMatch(/^\/cours\/c1\/resultat\?tentative=[^&]+$/); // pas de ?notion= : quiz général
 
     const attempts = read(`plugstudy:demo:col:users/${UID}/attempts`);
     expect(attempts).toHaveLength(1);
-    expect(attempts[0]).toMatchObject({ score: 3, total: 4, courseName: "Algorithmique" });
+    expect(attempts[0]).toMatchObject({ score: asked.length - 1, total: asked.length, courseName: "Algorithmique" });
     const saved = read(`plugstudy:demo:col:users/${UID}/courses/c1/notions`);
-    expect(saved.find((n: { id: string }) => n.id === "complexite").mastery).toBe(0);
-    expect(saved.find((n: { id: string }) => n.id === "recursivite").mastery).toBe(0.5);
+    expect(saved.find((n: { id: string }) => n.id === asked[0].notionId).mastery).toBe(0);
+    expect(saved.find((n: { id: string }) => n.id === asked[1].notionId).mastery).toBe(0.5);
     const [stored] = read(`plugstudy:demo:courses:${UID}`);
     expect(stored.progress).toBeGreaterThan(0);
     expect(stored.lastStudiedAt).not.toBeNull();
@@ -402,5 +398,106 @@ describe("Profil (écran 25)", () => {
     wrap(<ProfilPage />);
     expect(await screen.findByRole("button", { name: "Se déconnecter" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Supprimer mon compte" }).getAttribute("href")).toBe("/profil/suppression");
+  });
+});
+
+
+describe("Un quiz par notion", () => {
+  const base = questions.find((question) => question.notionId === "complexite")!;
+  const extra = [2, 3, 4].map((n) => ({ ...base, id: `q-complexite-${n}`, text: `Autre question ${n} sur la complexité ?` }));
+  const withExtra = () => {
+    seed();
+    write(`plugstudy:demo:col:users/${UID}/courses/c1/questions`, [...questions, ...extra]);
+  };
+
+  it("ne garde que les questions de la notion, trois au plus et dans l'ordre", () => {
+    const picked = notionQuestions([...questions, ...extra].reverse(), "complexite");
+    expect(picked.map((question) => question.id)).toEqual(["q-complexite", "q-complexite-2", "q-complexite-3"]);
+    expect(picked.every((question) => question.notionId === "complexite")).toBe(true);
+    expect(notionQuestions(questions, "inconnue")).toEqual([]);
+  });
+
+  it("donne la notion suivante de la séance, et rien après la dernière", () => {
+    const session = sessionNotions(notions);
+    expect(nextNotionId(notions, session[0].id)).toBe(session[1].id);
+    expect(nextNotionId(notions, session[session.length - 1].id)).toBeNull();
+    expect(nextNotionId(notions, "inconnue")).toBeNull();
+  });
+
+  it("la séance envoie vers le quiz de la notion affichée", async () => {
+    seed();
+    const user = userEvent.setup();
+    wrap(<SeancePage />);
+    const first = sessionNotions(notions)[0];
+    await screen.findByRole("heading", { name: first.title });
+    await user.click(screen.getByRole("button", { name: "Passer au quiz" }));
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith(`/cours/c1/quiz?notion=${first.id}`));
+  });
+
+  it("le quiz ne pose que les questions de la notion révisée", async () => {
+    withExtra();
+    window.history.pushState({}, "", "/?notion=complexite");
+    const user = userEvent.setup();
+    wrap(<QuizPage />);
+    expect(await screen.findByText(/Question 1 sur 3/)).toBeTruthy(); // 4 questions sur la notion, 3 retenues
+    expect(screen.getByText("Quiz sur la notion")).toBeTruthy();
+    expect(screen.getByText(/Complexité algorithmique · Question 1 sur 3/)).toBeTruthy();
+    expect(screen.getByRole("heading", { name: base.text })).toBeTruthy();
+
+    for (let n = 1; n <= 3; n++) {
+      await screen.findByText(new RegExp(`Question ${n} sur 3`));
+      await user.click(screen.getByText(base.choices[base.correctIndex]));
+      await user.click(screen.getByRole("button", { name: n === 3 ? "Voir mon résultat" : "Question suivante" }));
+    }
+    await waitFor(() => expect(router.push).toHaveBeenCalled());
+    expect(router.push.mock.calls[0][0]).toMatch(/^\/cours\/c1\/resultat\?tentative=.+&notion=complexite$/);
+    const [attempt] = read(`plugstudy:demo:col:users/${UID}/attempts`);
+    expect(attempt.total).toBe(3);
+    expect(attempt.answers.every((answer: QuizAnswer) => answer.notionId === "complexite")).toBe(true);
+  });
+
+  it("une notion sans question passe à la suivante au lieu de bloquer", async () => {
+    seed();
+    write(`plugstudy:demo:col:users/${UID}/courses/c1/questions`, questions.filter((question) => question.notionId !== "complexite"));
+    window.history.pushState({}, "", "/?notion=complexite");
+    wrap(<QuizPage />);
+    expect(await screen.findByText("Cette notion n’a pas encore de questions.")).toBeTruthy();
+    const next = nextNotionId(notions, "complexite");
+    expect(screen.getByRole("link", { name: "Notion suivante" }).getAttribute("href")).toBe(`/cours/c1/seance?notion=${next}`);
+  });
+
+  const attemptOn = (notionId: string, correct: boolean) => ({
+    id: "t1",
+    courseId: "c1",
+    courseName: "Algorithmique",
+    at: Date.now(),
+    score: correct ? 1 : 0,
+    total: 1,
+    answers: [{ questionId: "q", notionId, notionTitle: "La notion", source: "Algorithmique, p. 1", correct }],
+  });
+
+  it("le résultat propose la notion suivante, puis terminer", async () => {
+    seed();
+    const session = sessionNotions(notions);
+    write(`plugstudy:demo:col:users/${UID}/attempts`, [attemptOn(session[0].id, true)]);
+    window.history.pushState({}, "", `/?tentative=t1&notion=${session[0].id}`);
+    wrap(<ResultatPage />);
+    const next = await screen.findByRole("link", { name: "Notion suivante" });
+    expect(next.getAttribute("href")).toBe(`/cours/c1/seance?notion=${session[1].id}`);
+    expect(screen.getByRole("link", { name: "Terminer" }).getAttribute("href")).toBe("/accueil");
+    expect(screen.queryByRole("link", { name: "Revoir la notion" })).toBeNull();
+  });
+
+  it("le résultat de la dernière notion propose le quiz général, et revoir si besoin", async () => {
+    seed();
+    const session = sessionNotions(notions);
+    const last = session[session.length - 1];
+    write(`plugstudy:demo:col:users/${UID}/attempts`, [attemptOn(last.id, false)]);
+    window.history.pushState({}, "", `/?tentative=t1&notion=${last.id}`);
+    wrap(<ResultatPage />);
+    expect(await screen.findByRole("link", { name: "Revoir la notion" })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Notion suivante" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Passer au quiz général" }).getAttribute("href")).toBe("/cours/c1/quiz");
+    expect(screen.getByRole("link", { name: "Terminer" })).toBeTruthy();
   });
 });

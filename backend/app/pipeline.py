@@ -82,7 +82,7 @@ def process_course(
 
         # 3. Quiz + passages pour l'assistant (embeddings : sans eux, l'assistant cherche par mots).
         # Le quiz est au cœur du produit : l'IA répond parfois dans un format inattendu, on réessaie jusqu'à 3 fois.
-        wanted = min(len(notions), settings.max_questions, 3)
+        wanted = min(len(notions), settings.max_questions)  # au moins une question par notion retenue
         questions: list = []
         for attempt in range(QUIZ_ATTEMPTS):
             try:

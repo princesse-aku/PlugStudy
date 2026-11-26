@@ -1,7 +1,8 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/Button";
 import { ProgressBar } from "@/components/CourseCard";
 import { DemoBanner } from "@/components/DemoBanner";
@@ -10,17 +11,21 @@ import { BackHeader, Notice, SourceChip } from "@/components/Revision";
 import { Screen } from "@/components/Screen";
 import { useI18n } from "@/lib/i18n";
 import { loadQuestions, saveQuizAttempt, useNotions } from "@/lib/data";
-import { pickQuizQuestions } from "@/lib/revision";
+import { generalQuizQuestions, nextNotionId, notionQuestions } from "@/lib/revision";
 import { useCourseScreen } from "@/lib/use-courses";
 import type { Question, QuizAnswer } from "@/lib/types";
 
 const LETTERS = ["A", "B", "C", "D", "E", "F"];
 
-/** Écran 20 · Quiz de fin de séance : une question à la fois, avec « Pourquoi ce n'est pas A » et la source. */
-export default function QuizPage() {
+/**
+ * Écran 20 · Quiz : une question à la fois, avec « Pourquoi ce n'est pas A » et la source.
+ * Avec `?notion=`, c'est le quiz de cette notion seulement (celle qu'on vient de réviser) ; sans, le quiz général de fin de cours.
+ */
+function Quiz() {
   const { id } = useParams<{ id: string }>();
   const { t } = useI18n();
   const router = useRouter();
+  const wanted = useSearchParams().get("notion");
   const state = useCourseScreen(id);
   const uid = state.phase === "ready" ? state.user.uid : undefined;
   const { items: notions, loaded } = useNotions(uid, id);
@@ -38,9 +43,9 @@ export default function QuizPage() {
     if (!uid || !loaded || started.current) return;
     started.current = true;
     loadQuestions(uid, id)
-      .then((all) => setQuestions(pickQuizQuestions(all, notions)))
+      .then((all) => setQuestions(wanted ? notionQuestions(all, wanted) : generalQuizQuestions(all, notions)))
       .catch(() => setQuestions([]));
-  }, [uid, loaded, id, notions]);
+  }, [uid, loaded, id, notions, wanted]);
 
   if (state.phase === "waiting") return <Screen />;
   if (state.phase === "missing") {
@@ -53,17 +58,31 @@ export default function QuizPage() {
   }
 
   const { user, course } = state;
-  const back = `/cours/${id}/seance`;
+  const focus = wanted ? notions.find((notion) => notion.id === wanted) : undefined;
+  const back = focus ? `/cours/${id}/seance?notion=${focus.id}` : `/cours/${id}/seance`;
+  const title = focus ? t("Quiz sur la notion") : t("Quiz général");
 
   if (questions === null) return <Screen />;
   if (questions.length === 0) {
+    const next = focus ? nextNotionId(notions, focus.id) : null;
     return (
       <Screen>
-        <BackHeader href={back} title={t("Quiz de fin de séance")} />
-        <Notice>{t("Le quiz de ce cours n’est pas encore prêt.")}</Notice>
+        <BackHeader href={back} title={title} subtitle={focus?.title} />
+        <Notice>{focus ? t("Cette notion n’a pas encore de questions.") : t("Le quiz de ce cours n’est pas encore prêt.")}</Notice>
+        {focus ? (
+          <div className="px-5 pb-6 pt-2">
+            <Link
+              href={next ? `/cours/${id}/seance?notion=${next}` : "/accueil"}
+              className="flex min-h-[52px] items-center justify-center rounded-[14px] bg-accent px-4 text-base font-semibold text-on-accent hover:bg-deep"
+            >
+              {next ? t("Notion suivante") : t("Terminer")}
+            </Link>
+          </div>
+        ) : null}
       </Screen>
     );
   }
+  const position = t("Question {n} sur {total}", { n: index + 1, total: questions.length });
 
   const question = questions[index];
   const last = index === questions.length - 1;
@@ -95,7 +114,7 @@ export default function QuizPage() {
     setError(null);
     try {
       const attemptId = await saveQuizAttempt(user, course, notions, all);
-      router.push(`/cours/${id}/resultat?tentative=${attemptId}`);
+      router.push(`/cours/${id}/resultat?tentative=${attemptId}${focus ? `&notion=${focus.id}` : ""}`);
     } catch {
       setError(t("Impossible d’enregistrer ton résultat. Vérifie ta connexion et réessaie."));
       setSaving(false);
@@ -105,7 +124,7 @@ export default function QuizPage() {
   return (
     <Screen>
       <DemoBanner />
-      <BackHeader href={back} title={t("Quiz de fin de séance")} subtitle={t("Question {n} sur {total}", { n: index + 1, total: questions.length })} />
+      <BackHeader href={back} title={title} subtitle={focus ? `${focus.title} · ${position}` : position} />
       <div className="px-5 pb-2">
         <ProgressBar value={Math.round(((index + 1) / questions.length) * 100)} label={t("Avancement du quiz")} />
       </div>
@@ -186,5 +205,13 @@ export default function QuizPage() {
         </Button>
       </div>
     </Screen>
+  );
+}
+
+export default function QuizPage() {
+  return (
+    <Suspense fallback={<Screen />}>
+      <Quiz />
+    </Suspense>
   );
 }

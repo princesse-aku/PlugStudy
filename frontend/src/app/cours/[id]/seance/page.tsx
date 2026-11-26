@@ -161,7 +161,7 @@ function Seance() {
       </div>
 
       <div className="px-5 pb-6 pt-2">
-        <Button type="button" onClick={() => void leave(() => router.push(`/cours/${id}/quiz`))}>
+        <Button type="button" onClick={() => void leave(() => router.push(`/cours/${id}/quiz?notion=${notion.id}`))}>
           {t("Passer au quiz")}
         </Button>
       </div>

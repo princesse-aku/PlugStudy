@@ -51,6 +51,7 @@ class FakeAI:
         self.notions = NOTIONS if notions is None else notions
         self.fail = fail
         self.no_embeddings = no_embeddings
+        self.questions_per_notion = 3  # comme la consigne réelle : 3 questions par notion
         self.calls: list[tuple[str, str]] = []
         self.prompts: list[str] = []  # les consignes système complètes, pour vérifier la langue demandée
 
@@ -69,12 +70,13 @@ class FakeAI:
                 "questions": [
                     {
                         "notion": notion_id,
-                        "text": f"Que dit le cours sur {title} ?",
+                        "text": f"Que dit le cours sur {title} ? (aspect {aspect})",
                         "choices": ["Bonne réponse", "Mauvaise A", "Mauvaise B", "Mauvaise C"],
                         "correct": 0,
                         "explanation": "La bonne réponse reprend le cours ; les autres sont des confusions fréquentes.",
                     }
                     for notion_id, title in ids
+                    for aspect in range(1, self.questions_per_notion + 1)
                 ]
             }
         if system.startswith("Tu es l'assistant"):
