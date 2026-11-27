@@ -21,6 +21,8 @@ class Store(Protocol):
 
     def list(self, path: Path) -> list[dict[str, Any]]: ...
 
+    def preparing_courses(self) -> list[tuple[Path, dict[str, Any]]]: ...
+
 
 def course_path(uid: str, course_id: str, *rest: str) -> Path:
     return ("users", uid, "courses", course_id, *rest)
@@ -52,6 +54,13 @@ class MemoryStore:
             if len(doc_path) == depth and doc_path[: len(path)] == path
         ]
 
+    def preparing_courses(self) -> list[tuple[Path, dict[str, Any]]]:
+        return [
+            (path, json.loads(json.dumps(doc)))
+            for path, doc in self.docs.items()
+            if len(path) == 4 and path[0] == "users" and path[2] == "courses" and doc.get("status") == "preparing"
+        ]
+
 
 class FirestoreStore:
     """Firestore via le SDK Admin."""
@@ -80,3 +89,12 @@ class FirestoreStore:
     def list(self, path: Path) -> list[dict[str, Any]]:
         collection = self._client.collection("/".join(path))
         return [{**doc.to_dict(), "id": doc.id} for doc in collection.stream()]
+
+    def preparing_courses(self) -> list[tuple[Path, dict[str, Any]]]:
+        # Parcours par étudiant (une requête par étudiant) : évite d'exiger un index de groupe de collections.
+        found: list[tuple[Path, dict[str, Any]]] = []
+        for user in self._client.collection("users").list_documents():
+            query = user.collection("courses").where("status", "==", "preparing")
+            for doc in query.stream():
+                found.append((("users", user.id, "courses", doc.id), doc.to_dict() or {}))
+        return found

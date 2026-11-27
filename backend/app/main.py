@@ -9,7 +9,9 @@ Toutes les routes de cours demandent le jeton Firebase de l'étudiant (en-tête 
 
 from __future__ import annotations
 
+import logging
 import re
+import threading
 import time
 from functools import lru_cache
 
@@ -23,6 +25,7 @@ from app.config import Settings, get_settings
 from app.extract import ALLOWED_EXTENSIONS, extension_of
 from app.generate import answer_question, not_found_message
 from app.pipeline import process_course
+from app.recovery import recover_in_background
 from app.retrieval import top_by_embedding, top_by_words
 from app.store import Store, course_path
 
@@ -49,6 +52,23 @@ class AssistantReply(BaseModel):
 
 
 app = FastAPI(title="PlugStudy API", version="0.1.0", docs_url=None, redoc_url=None)
+BOOTED_AT = time.time()
+
+
+@app.on_event("startup")
+def _recover_interrupted_courses() -> None:
+    """Les cours coupés par un redémarrage sont marqués en échec (voir app/recovery.py)."""
+    settings = get_settings()
+    if not settings.firebase_credentials_json and not settings.firebase_project_id:
+        return  # pas de Firebase configuré (développement) : rien à reprendre
+
+    def run() -> None:
+        try:
+            recover_in_background(get_store(settings), BOOTED_AT)
+        except Exception:  # noqa: BLE001
+            logging.getLogger("plugstudy.recovery").exception("reprise après redémarrage impossible")
+
+    threading.Thread(target=run, daemon=True).start()
 
 _settings = get_settings()
 app.add_middleware(
