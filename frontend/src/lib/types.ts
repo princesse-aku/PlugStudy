@@ -56,7 +56,7 @@ export interface Course {
   /** Pourquoi la préparation a échoué (status « error ») : écrit par le backend. */
   /** L'étudiant a fermé l'avis d'échec : le cours ne lui est plus signalé. */
   dismissed?: boolean;
-  errorReason?: "format" | "unreadable" | "empty" | "ai" | "failed" | "upload";
+  errorReason?: "format" | "unreadable" | "empty" | "ai" | "failed" | "upload" | "stalled";
 }
 
 export type CourseInput = Pick<Course, "name" | "description" | "category" | "fileName" | "fileSize">;

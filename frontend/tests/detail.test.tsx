@@ -133,10 +133,11 @@ describe("Règles du détail du cours", () => {
 
 describe("Détail du cours : en préparation (écran 14)", () => {
   it("montre l'avancement et verrouille les onglets", async () => {
-    seed({ course: { status: "preparing", progress: 0, prepStep: 1, summary: undefined }, content: false });
+    // Récent : au-delà de 10 minutes, un cours en préparation est montré comme bloqué.
+    seed({ course: { status: "preparing", progress: 0, prepStep: 1, summary: undefined, createdAt: Date.now() - 120000 }, content: false });
     wrap(<CoursDetailPage />);
     expect(await screen.findByText("On prépare ton cours")).toBeTruthy();
-    expect(screen.getByText(/Ajouté il y a 24 h|Ajouté hier/)).toBeTruthy();
+    expect(screen.getByText(/^Ajouté/)).toBeTruthy();
     const steps = screen.getAllByRole("listitem");
     expect(within(steps[0]).getByText(/terminé/)).toBeTruthy();
     expect(within(steps[1]).getByText(/en cours/)).toBeTruthy();
@@ -147,7 +148,7 @@ describe("Détail du cours : en préparation (écran 14)", () => {
   });
 
   it("propose le contenu d'exemple (développement) puis passe à la fiche", async () => {
-    seed({ course: { status: "preparing", progress: 0, prepStep: 0, summary: undefined }, content: false });
+    seed({ course: { status: "preparing", progress: 0, prepStep: 0, summary: undefined, createdAt: Date.now() - 120000 }, content: false });
     const user = userEvent.setup();
     wrap(<CoursDetailPage />);
     await user.click(await screen.findByRole("button", { name: "Remplir avec un contenu d’exemple" }));

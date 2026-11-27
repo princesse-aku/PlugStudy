@@ -116,6 +116,9 @@ export const EN_COURSES: Record<string, string> = {
   "Le fichier ressemble à une image (PDF scanné ou photo). Choisis un PDF ou un Word avec du texte.":
     "The file looks like an image (scanned PDF or photo). Choose a PDF or Word file with text.",
   "Ce fichier n’a pas pu être ouvert": "This file couldn’t be opened",
+  "La préparation a pris trop de temps": "Preparation took too long",
+  "La préparation s’est interrompue. Ajoute de nouveau ton fichier : cela prend environ une minute.":
+    "Preparation was interrupted. Add your file again: it takes about a minute.",
   "Formats acceptés : PDF, DOCX, PPTX ou TXT. Les anciens fichiers PPT doivent être enregistrés en PPTX.":
     "Accepted formats: PDF, DOCX, PPTX or TXT. Old PPT files must be saved as PPTX.",
   "Aucune notion trouvée": "No concepts found",

@@ -88,6 +88,11 @@ export function errorMessage(reason: Course["errorReason"]): { title: string; te
         title: "L’IA est momentanément indisponible",
         text: "Réessaie dans un instant en ajoutant de nouveau ton fichier.",
       };
+    case "stalled":
+      return {
+        title: "La préparation a pris trop de temps",
+        text: "La préparation s’est interrompue. Ajoute de nouveau ton fichier : cela prend environ une minute.",
+      };
     default:
       return { title: "La préparation a échoué", text: "Réessaie en ajoutant de nouveau ton fichier." };
   }
