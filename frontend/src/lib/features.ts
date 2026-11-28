@@ -14,8 +14,8 @@ export const features = {
   planning: true,
   /** « Changer la photo » dans le profil (demande un stockage de fichiers). */
   profilePhoto: false,
-  /** « Supprimer mon compte » (écran 31, pas encore construit). */
-  deleteAccount: false,
+  /** « Supprimer mon compte » (écran 31 : confirmation en écrivant SUPPRIMER, puis suppression par le serveur). */
+  deleteAccount: true,
   /**
    * Validation stricte : sous 75 % au quiz d'une notion, l'étudiant doit la réviser avant de passer à la suivante.
    * Désactivée au départ (l'objectif est l'adoption) : le renvoi à la notion est conseillé, le passage reste possible.

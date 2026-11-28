@@ -51,7 +51,7 @@ describe("Réglages du MVP", () => {
       suivi: false,
       planning: true,
       profilePhoto: false,
-      deleteAccount: false,
+      deleteAccount: true,
       strictValidation: false,
       typicalCourses: false,
     });
@@ -127,13 +127,13 @@ describe("Navigation du MVP", () => {
     expect(screen.queryByText(/Suivi/)).toBeNull();
   });
 
-  it("le profil n'a ni « Changer la photo » ni « Supprimer mon compte »", async () => {
+  it("le profil n'a pas « Changer la photo » mais propose « Supprimer mon compte »", async () => {
     seed();
     wrap(<ProfilPage />);
     expect(await screen.findByRole("button", { name: "Se déconnecter" })).toBeTruthy();
     expect(screen.getByLabelText("Nom complet")).toBeTruthy();
     expect(screen.queryByText("Changer la photo")).toBeNull();
-    expect(screen.queryByText("Supprimer mon compte")).toBeNull();
+    expect(screen.getByRole("link", { name: "Supprimer mon compte" }).getAttribute("href")).toBe("/profil/suppression");
   });
 });
 

@@ -23,6 +23,8 @@ class Store(Protocol):
 
     def preparing_courses(self) -> list[tuple[Path, dict[str, Any]]]: ...
 
+    def delete_user(self, uid: str) -> None: ...
+
 
 def course_path(uid: str, course_id: str, *rest: str) -> Path:
     return ("users", uid, "courses", course_id, *rest)
@@ -33,6 +35,7 @@ class MemoryStore:
 
     def __init__(self) -> None:
         self.docs: dict[Path, dict[str, Any]] = {}
+        self.deleted_users: list[str] = []  # comptes supprimés (les tests le lisent)
 
     def get(self, path: Path) -> dict[str, Any] | None:
         doc = self.docs.get(path)
@@ -60,6 +63,11 @@ class MemoryStore:
             for path, doc in self.docs.items()
             if len(path) == 4 and path[0] == "users" and path[2] == "courses" and doc.get("status") == "preparing"
         ]
+
+    def delete_user(self, uid: str) -> None:
+        for path in [path for path in self.docs if path[:2] == ("users", uid)]:
+            del self.docs[path]
+        self.deleted_users.append(uid)
 
 
 class FirestoreStore:
@@ -98,3 +106,13 @@ class FirestoreStore:
             for doc in query.stream():
                 found.append((("users", user.id, "courses", doc.id), doc.to_dict() or {}))
         return found
+
+    def delete_user(self, uid: str) -> None:
+        """Supprime tout ce que l'étudiant a dans Firestore (users/{uid} et tout ce qu'il contient), puis son compte de connexion."""
+        from firebase_admin import auth
+
+        self._client.recursive_delete(self._client.document(f"users/{uid}"))
+        try:
+            auth.delete_user(uid)
+        except auth.UserNotFoundError:
+            pass  # déjà supprimé : le résultat voulu

@@ -92,7 +92,7 @@ _settings = get_settings()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_settings.origins,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["Authorization", "Content-Type"],
     max_age=600,
 )
@@ -230,3 +230,13 @@ def rephrase(
     except AIError:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "La reformulation est momentanément indisponible.") from None
     return RephraseReply(texts=texts)
+
+
+@app.delete("/account", status_code=status.HTTP_204_NO_CONTENT)
+def delete_account(uid: str = Depends(current_uid), store: Store = Depends(get_store)) -> None:
+    """Supprime définitivement le compte de l'étudiant connecté : ses cours, notions, quiz, planning, profil et son accès."""
+    try:
+        store.delete_user(uid)
+    except Exception:  # noqa: BLE001
+        logging.getLogger("plugstudy.account").exception("suppression du compte impossible")
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "La suppression est momentanément indisponible.") from None

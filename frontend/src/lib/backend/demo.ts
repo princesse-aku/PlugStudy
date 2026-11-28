@@ -106,6 +106,14 @@ export const demoBackend: Backend = {
     writeUser(null);
   },
 
+  async deleteAccount(user) {
+    // Efface tout ce que ce compte a gardé dans le navigateur (profil, cours, quiz, planning…).
+    for (const key of Object.keys(window.localStorage)) {
+      if (key.startsWith("plugstudy:demo:") && key.includes(user.uid)) window.localStorage.removeItem(key);
+    }
+    writeUser(null);
+  },
+
   async getProfile(uid) {
     try {
       const raw = window.localStorage.getItem(profileKey(uid));

@@ -299,6 +299,28 @@ export const firebaseBackend: Backend = {
     await setDoc(doc(getFirestore(app()), path[0], ...path.slice(1)), data, { merge });
   },
 
+  async deleteAccount() {
+    // Le serveur (SDK Admin) supprime les données de l'étudiant et son compte : pas de reconnexion récente à demander.
+    const base = (process.env.NEXT_PUBLIC_API_URL ?? "").trim().replace(/\/$/, "");
+    const token = await firebaseBackend.getIdToken();
+    if (!base || !token) throw new UserFacingError("La suppression n’est pas disponible pour le moment. Réessaie plus tard.");
+    await fetch(`${base}/health`, { signal: AbortSignal.timeout(60_000) }).catch(() => undefined); // réveille le serveur
+    let response: Response;
+    try {
+      response = await fetch(`${base}/account`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    } catch {
+      throw new UserFacingError("Impossible de joindre le serveur. Vérifie ta connexion et réessaie.");
+    }
+    if (!response.ok) {
+      throw new UserFacingError(
+        response.status === 401
+          ? "Ta session a expiré. Connecte-toi de nouveau."
+          : "Impossible de supprimer ton compte pour le moment. Réessaie dans un instant."
+      );
+    }
+    await firebaseSignOut(getAuth(app())).catch(() => undefined);
+  },
+
   async updateDisplayName(user, name) {
     const current = getAuth(app()).currentUser;
     if (current) await updateProfile(current, { displayName: name });

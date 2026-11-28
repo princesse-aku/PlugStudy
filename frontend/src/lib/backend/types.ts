@@ -33,6 +33,8 @@ export interface Backend {
   setDocument(path: string[], data: Record<string, unknown>, merge?: boolean): Promise<void>;
   /** Change le nom affiché du compte. */
   updateDisplayName(user: AppUser, name: string): Promise<void>;
+  /** Supprime définitivement le compte et toutes ses données, puis déconnecte. */
+  deleteAccount(user: AppUser): Promise<void>;
 }
 
 /** Erreur dont le message est déjà prêt à être montré à l'étudiant. */
