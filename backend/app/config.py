@@ -30,7 +30,7 @@ class Settings(BaseSettings):
 
     # Sécurité et limites.
     allowed_origins: str = "http://localhost:3000"  # séparées par des virgules
-    max_upload_mb: int = 20
+    max_upload_mb: int = 100
     min_text_chars: int = 200  # en dessous, le fichier est considéré comme illisible (PDF scanné, photo…)
     rate_limit_per_minute: int = 20
 

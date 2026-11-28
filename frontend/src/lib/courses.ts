@@ -46,20 +46,16 @@ export function extensionOf(fileName: string): string {
   return fileName.split(".").pop()?.toLowerCase() ?? "";
 }
 
-/** Taille maximale d'un fichier de cours (la même limite que le backend). */
-export const MAX_UPLOAD_MB = 20;
-
 const IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "bmp", "tif", "tiff"];
 
-export type ImportProblem = "unreadable" | "emptyfile" | "toolarge";
+export type ImportProblem = "unreadable" | "emptyfile";
 
 /**
- * Problème visible avant même d'envoyer le fichier : une image (photo ou scan : l'IA ne lit que du texte), un fichier vide ou trop gros.
+ * Problème visible avant même d'envoyer le fichier : une image (photo ou scan : l'IA ne lit que du texte), ou un fichier vide. Aucune limite de taille côté application.
  * Un PDF scanné, lui, ne se voit qu'à la lecture : c'est le backend qui le signale (« unreadable »).
  */
 export function importProblem(file: Pick<File, "name" | "size">): ImportProblem | null {
   if (IMAGE_EXTENSIONS.includes(extensionOf(file.name))) return "unreadable";
   if (file.size === 0) return "emptyfile";
-  if (file.size > MAX_UPLOAD_MB * 1024 * 1024) return "toolarge";
   return null;
 }

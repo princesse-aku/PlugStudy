@@ -7,7 +7,7 @@ et les réponses de l'assistant. Les clés d'API restent ici, jamais dans le fro
 
 | Route | Rôle |
 | --- | --- |
-| `POST /courses/{id}/process` | Reçoit le fichier d'un cours (PDF, DOCX, PPTX, TXT ; 20 Mo au plus) et répond `202`. La préparation continue en arrière-plan. |
+| `POST /courses/{id}/process` | Reçoit le fichier d'un cours (PDF, DOCX, PPTX, TXT ; 100 Mo au plus : garde-fou de la mémoire du serveur) et répond `202`. La préparation continue en arrière-plan. |
 | `POST /courses/{id}/assistant` | `{ "question": "…" }` → `{ "text", "source" }` : réponse tirée **uniquement** des passages du cours. |
 | `GET /health` | Vérification de santé (Render). |
 

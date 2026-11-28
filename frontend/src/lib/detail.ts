@@ -71,11 +71,6 @@ export function errorMessage(reason: Course["errorReason"] | ImportProblem): { t
   switch (reason) {
     case "emptyfile":
       return { title: "Ce fichier est vide", text: "Choisis un fichier qui contient ton cours." };
-    case "toolarge":
-      return {
-        title: "Ce fichier est trop volumineux",
-        text: "La taille maximale est de 20 Mo. Réduis le fichier ou envoie ton cours en plusieurs parties.",
-      };
     case "unreadable":
       return {
         title: "Impossible de lire ce fichier",

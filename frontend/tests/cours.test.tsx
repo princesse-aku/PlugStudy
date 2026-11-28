@@ -136,8 +136,7 @@ describe("Ajouter un cours", () => {
   it("repère à l'avance les fichiers illisibles (écran 28 : erreur d'import)", () => {
     expect(importProblem({ name: "scan_cours.JPG", size: 500 })).toBe("unreadable");
     expect(importProblem({ name: "cours.pdf", size: 0 })).toBe("emptyfile");
-    expect(importProblem({ name: "cours.pdf", size: 21 * 1024 * 1024 })).toBe("toolarge");
-    expect(importProblem({ name: "cours.pdf", size: 20 * 1024 * 1024 })).toBeNull();
+    expect(importProblem({ name: "cours.pdf", size: 500 * 1024 * 1024 })).toBeNull(); // pas de limite de taille
   });
 
   it("une photo de cours ouvre l'erreur d'import : « Créer le cours » grisé et un autre fichier à choisir", async () => {
