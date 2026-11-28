@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, type DragEvent, type FormEvent } from "react";
 import { Button } from "@/components/Button";
 import { DemoBanner } from "@/components/DemoBanner";
+import { ImportError } from "@/components/ImportError";
 import { Field, Select, TextInput, describedBy } from "@/components/Field";
 import {
   CalendarIcon,
@@ -19,7 +20,7 @@ import { useRequireStudent } from "@/lib/auth-context";
 import { sendCourseFile } from "@/lib/api";
 import { backend } from "@/lib/backend";
 import { useI18n } from "@/lib/i18n";
-import { extensionOf, nameFromFile } from "@/lib/courses";
+import { extensionOf, importProblem, nameFromFile, type ImportProblem } from "@/lib/courses";
 import { fileSizeLabel } from "@/lib/time";
 import { CATEGORIES, COURSE_EXTENSIONS, type Category, type Profile } from "@/lib/types";
 
@@ -69,6 +70,7 @@ export default function AjouterCoursPage() {
   const { ok, user, profile } = useRequireStudent();
   const input = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [problem, setProblem] = useState<ImportProblem | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState<Category>(() => guessCategory(profile));
@@ -82,11 +84,20 @@ export default function AjouterCoursPage() {
 
   function choose(picked: File | undefined) {
     if (!picked) return;
+    // Photo, scan, fichier vide ou trop gros : l'écran « Erreur d'import » (le bouton « Créer le cours » reste grisé).
+    const found = importProblem(picked);
+    if (found) {
+      setFileError(null);
+      setFile(picked);
+      setProblem(found);
+      return;
+    }
     if (!(COURSE_EXTENSIONS as readonly string[]).includes(extensionOf(picked.name))) {
       setFileError(FORMAT_ERROR);
       return;
     }
     setFileError(null);
+    setProblem(null);
     setFile(picked);
     setName(nameFromFile(picked.name));
     setCategory(guessCategory(profile));
@@ -100,7 +111,7 @@ export default function AjouterCoursPage() {
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!file || !name.trim() || !user) return;
+    if (!file || problem || !name.trim() || !user) return;
     setSaving(true);
     setFormError(null);
     try {
@@ -130,7 +141,10 @@ export default function AjouterCoursPage() {
     <button
       type="button"
       aria-label={t("Retour")}
-      onClick={() => setFile(null)}
+      onClick={() => {
+        setFile(null);
+        setProblem(null);
+      }}
       className="flex h-11 w-11 items-center justify-center"
     >
       <ChevronLeftIcon />
@@ -150,7 +164,11 @@ export default function AjouterCoursPage() {
           <div className="flex flex-col">
             <h1 className="font-display text-lg font-bold">{t("Ajouter un cours")}</h1>
             <p className="text-[13px] text-muted">
-              {file ? t("Vérifie, puis crée ton cours.") : t("Dépose ton fichier, PlugStudy prépare le reste.")}
+              {problem
+                ? t("Ce fichier ne peut pas être lu.")
+                : file
+                  ? t("Vérifie, puis crée ton cours.")
+                  : t("Dépose ton fichier, PlugStudy prépare le reste.")}
             </p>
           </div>
         </header>
@@ -170,7 +188,18 @@ export default function AjouterCoursPage() {
         />
 
         <div className="flex flex-1 flex-col gap-4 px-5 pt-2">
-          {file ? (
+          {file && problem ? (
+            <ImportError
+              fileName={file.name}
+              fileSize={file.size}
+              reason={problem}
+              action={
+                <Button type="button" variant="secondary" onClick={() => input.current?.click()}>
+                  {t("Choisir un autre fichier")}
+                </Button>
+              }
+            />
+          ) : file ? (
             <>
               <div className="flex items-center gap-3 rounded-2xl border border-line bg-card p-3.5">
                 <span className="text-pale2">
@@ -259,7 +288,7 @@ export default function AjouterCoursPage() {
             </div>
           )}
 
-          <AiPrepares />
+          {problem ? null : <AiPrepares />}
 
           {formError ? (
             <p role="alert" className="rounded-xl bg-danger-bg px-4 py-3 text-sm text-danger">
@@ -269,7 +298,7 @@ export default function AjouterCoursPage() {
         </div>
 
         <div className="px-5 pb-6 pt-2">
-          <Button type="submit" disabled={!file || !name.trim() || saving} aria-busy={saving}>
+          <Button type="submit" disabled={!file || !!problem || !name.trim() || saving} aria-busy={saving}>
             {saving ? t("Création…") : t("Créer le cours")}
           </Button>
         </div>

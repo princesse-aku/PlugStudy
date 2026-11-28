@@ -6,7 +6,7 @@ import { AuthProvider } from "@/lib/auth-context";
 import AccueilPage from "@/app/accueil/page";
 import CoursPage from "@/app/cours/page";
 import AjouterCoursPage from "@/app/cours/ajouter/page";
-import { averageProgress, countCourses, filterCourses, nameFromFile } from "@/lib/courses";
+import { averageProgress, countCourses, filterCourses, importProblem, nameFromFile } from "@/lib/courses";
 import { fileSizeLabel, relativeTime, shortDate } from "@/lib/time";
 import type { Course } from "@/lib/types";
 
@@ -129,8 +129,44 @@ describe("Ajouter un cours", () => {
     seed();
     const user = userEvent.setup({ applyAccept: false });
     wrap(<AjouterCoursPage />);
-    await user.upload(await screen.findByTestId("fichier"), new File(["x"], "photo.png", { type: "image/png" }));
+    await user.upload(await screen.findByTestId("fichier"), new File(["x"], "tableau.xlsx", { type: "application/vnd.ms-excel" }));
     expect((await screen.findByRole("alert")).textContent).toContain("Ce format n’est pas pris en charge");
+  });
+
+  it("repère à l'avance les fichiers illisibles (écran 28 : erreur d'import)", () => {
+    expect(importProblem({ name: "scan_cours.JPG", size: 500 })).toBe("unreadable");
+    expect(importProblem({ name: "cours.pdf", size: 0 })).toBe("emptyfile");
+    expect(importProblem({ name: "cours.pdf", size: 21 * 1024 * 1024 })).toBe("toolarge");
+    expect(importProblem({ name: "cours.pdf", size: 20 * 1024 * 1024 })).toBeNull();
+  });
+
+  it("une photo de cours ouvre l'erreur d'import : « Créer le cours » grisé et un autre fichier à choisir", async () => {
+    seed();
+    const user = userEvent.setup({ applyAccept: false });
+    wrap(<AjouterCoursPage />);
+    await user.upload(await screen.findByTestId("fichier"), new File(["x"], "scan_cours.png", { type: "image/png" }));
+    expect(await screen.findByText("Impossible de lire ce fichier")).toBeTruthy();
+    expect(screen.getByText("scan_cours.png")).toBeTruthy();
+    expect(screen.getByText(/Choisis un PDF ou un Word avec du texte/)).toBeTruthy();
+    expect(screen.getByText("Formats acceptés : PDF, DOCX, PPTX ou TXT.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Créer le cours" }).hasAttribute("disabled")).toBe(true);
+    expect(screen.queryByLabelText("Nom du cours")).toBeNull();
+    expect(screen.getByRole("button", { name: "Choisir un autre fichier" })).toBeTruthy();
+
+    // Un fichier lisible efface l'erreur et rouvre le formulaire.
+    await user.upload(screen.getByTestId("fichier"), pdf);
+    expect(((await screen.findByLabelText("Nom du cours")) as HTMLInputElement).value).toBe("Structures de donnees");
+    expect(screen.queryByText("Impossible de lire ce fichier")).toBeNull();
+    expect(screen.getByRole("button", { name: "Créer le cours" }).hasAttribute("disabled")).toBe(false);
+  });
+
+  it("un fichier vide est signalé comme tel", async () => {
+    seed();
+    const user = userEvent.setup();
+    wrap(<AjouterCoursPage />);
+    await user.upload(await screen.findByTestId("fichier"), new File([], "vide.pdf", { type: "application/pdf" }));
+    expect(await screen.findByText("Ce fichier est vide")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Créer le cours" }).hasAttribute("disabled")).toBe(true);
   });
 
   it("propose le nom et la catégorie, puis crée le cours", async () => {

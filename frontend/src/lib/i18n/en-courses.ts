@@ -155,6 +155,13 @@ export const EN_COURSES: Record<string, string> = {
   "Pose ta question sur ce cours": "Ask a question about this course",
   "Ouvrir la conversation": "Open the conversation",
   "Choisir un autre fichier": "Choose another file",
+  "Ce fichier ne peut pas être lu.": "This file can’t be read.",
+  "Formats acceptés : PDF, DOCX, PPTX ou TXT.": "Accepted formats: PDF, DOCX, PPTX or TXT.",
+  "Ce fichier est vide": "This file is empty",
+  "Choisis un fichier qui contient ton cours.": "Choose a file that contains your course.",
+  "Ce fichier est trop volumineux": "This file is too large",
+  "La taille maximale est de 20 Mo. Réduis le fichier ou envoie ton cours en plusieurs parties.":
+    "The maximum size is 20 MB. Shrink the file or send your course in several parts.",
   "Réviser ce cours": "Study this course",
   "Lancer un quiz": "Start a quiz",
   "Impossible de lire ce fichier. Enregistre-le sur ton téléphone, puis choisis-le de nouveau.":

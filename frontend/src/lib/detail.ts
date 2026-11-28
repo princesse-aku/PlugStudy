@@ -1,3 +1,4 @@
+import type { ImportProblem } from "@/lib/courses";
 import { isDone } from "@/lib/courses";
 import { rankNotions, scorePercent } from "@/lib/revision";
 import { translate, type Lang } from "@/lib/i18n/translate";
@@ -66,8 +67,15 @@ export function recentConversations(messages: Message[], limit = 2): { text: str
 }
 
 /** Message d'une préparation qui a échoué (écran « Erreur d'import ») : la raison et quoi faire. Textes français : l'écran les traduit avec t(). */
-export function errorMessage(reason: Course["errorReason"]): { title: string; text: string } {
+export function errorMessage(reason: Course["errorReason"] | ImportProblem): { title: string; text: string } {
   switch (reason) {
+    case "emptyfile":
+      return { title: "Ce fichier est vide", text: "Choisis un fichier qui contient ton cours." };
+    case "toolarge":
+      return {
+        title: "Ce fichier est trop volumineux",
+        text: "La taille maximale est de 20 Mo. Réduis le fichier ou envoie ton cours en plusieurs parties.",
+      };
     case "unreadable":
       return {
         title: "Impossible de lire ce fichier",

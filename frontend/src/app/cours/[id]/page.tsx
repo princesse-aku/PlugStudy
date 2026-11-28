@@ -6,6 +6,7 @@ import { Suspense, useState, type FormEvent } from "react";
 import { Button } from "@/components/Button";
 import { ProgressBar } from "@/components/CourseCard";
 import { DemoBanner } from "@/components/DemoBanner";
+import { ImportError } from "@/components/ImportError";
 import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, LockIcon, MessageIcon, SendIcon } from "@/components/Icons";
 import { ImportanceBadge, Notice } from "@/components/Revision";
 import { Screen } from "@/components/Screen";
@@ -193,10 +194,7 @@ function Detail() {
         ) : null}
 
         {failed ? (
-          <section role="alert" className="flex flex-col gap-2.5 rounded-2xl border-2 border-danger bg-danger-bg px-4 py-[18px]">
-            <h2 className="font-display text-xl font-bold text-danger">{t(errorMessage(course.errorReason).title)}</h2>
-            <p className="text-[15px] leading-relaxed text-ink">{t(errorMessage(course.errorReason).text)}</p>
-          </section>
+          <ImportError fileName={course.fileName} fileSize={course.fileSize} reason={course.errorReason} />
         ) : null}
 
         {!waiting && tab === "fiche" ? (
