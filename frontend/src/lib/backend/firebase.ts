@@ -117,6 +117,7 @@ export function toCourse(snapshot: QueryDocumentSnapshot<DocumentData>): Course 
     errorReason: typeof data.errorReason === "string" ? (data.errorReason as Course["errorReason"]) : undefined,
     dismissed: data.dismissed === true ? true : undefined,
     studyMinutes: typeof data.studyMinutes === "number" ? data.studyMinutes : undefined,
+    validated: data.validated === true ? true : undefined,
   };
 }
 

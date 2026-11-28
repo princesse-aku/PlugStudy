@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { router } from "./setup";
 import { AuthProvider } from "@/lib/auth-context";
 import { backend, UserFacingError } from "@/lib/backend";
-import { askAssistant, sendCourseFile } from "@/lib/api";
+import { askAssistant, gradeAnswer, rephraseQuestions, sendCourseFile } from "@/lib/api";
 import AjouterCoursPage from "@/app/cours/ajouter/page";
 import AssistantPage from "@/app/cours/[id]/assistant/page";
 import CoursDetailPage from "@/app/cours/[id]/page";
@@ -15,7 +15,7 @@ import type { Course } from "@/lib/types";
 
 // Ces tests couvrent des fonctions cachées dans le MVP : on les rallume ici (voir src/lib/features.ts).
 vi.mock("@/lib/features", () => ({
-  features: { assistant: true, suivi: true, planning: true, profilePhoto: true, deleteAccount: true, typicalCourses: false },
+  features: { assistant: true, suivi: true, planning: true, profilePhoto: true, deleteAccount: true, strictValidation: false, typicalCourses: false },
 }));
 
 vi.mock("next/navigation", () => ({
@@ -119,6 +119,27 @@ describe("Appels au backend", () => {
     expect(await askAssistant("c1", "Question ?")).toBeNull();
     fetchMock.mockRejectedValue(new Error("réseau"));
     expect(await askAssistant("c1", "Question ?")).toBeNull();
+  });
+
+  it("fait corriger une réponse écrite, et renvoie null quand le serveur ne répond pas (correction sur place)", async () => {
+    fetchMock.mockResolvedValue(ok({ correct: true, feedback: "Idée juste." }));
+    expect(await gradeAnswer("c1", "n1", "ma réponse")).toEqual({ correct: true, feedback: "Idée juste." });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("http://api.test/courses/c1/grade");
+    expect(JSON.parse(init.body)).toEqual({ notionId: "n1", answer: "ma réponse" });
+    fetchMock.mockResolvedValue(ok({}, 503));
+    expect(await gradeAnswer("c1", "n1", "ma réponse")).toBeNull();
+    fetchMock.mockRejectedValue(new Error("réseau"));
+    expect(await gradeAnswer("c1", "n1", "ma réponse")).toBeNull();
+  });
+
+  it("demande la reformulation des questions et garde les originales en cas de panne", async () => {
+    fetchMock.mockResolvedValue(ok({ texts: { q1: "Autrement dit ?", q2: 42 } }));
+    expect(await rephraseQuestions("c1", ["q1", "q2"])).toEqual({ q1: "Autrement dit ?" });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ questionIds: ["q1", "q2"] });
+    fetchMock.mockResolvedValue(ok({}, 503));
+    expect(await rephraseQuestions("c1", ["q1"])).toEqual({});
+    expect(await rephraseQuestions("c1", [])).toEqual({});
   });
 });
 

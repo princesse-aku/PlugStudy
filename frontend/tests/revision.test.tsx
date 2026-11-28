@@ -13,23 +13,30 @@ import ProfilPage from "@/app/profil/page";
 import { dailyMinutes, formatMinutes, totalMinutes, weeklyMinutes } from "@/lib/activity";
 import {
   answerFromCourse,
+  applyQuiz,
   courseProgress,
   generalQuizQuestions,
+  generalUnlocked,
   importanceOf,
+  isPassed,
+  localGrade,
   nextMastery,
   nextNotionId,
   notionQuestions,
+  notionQuiz,
   notionScore,
+  pendingNotions,
   progressMessage,
   resultTitle,
   sessionNotions,
+  writtenQuestion,
 } from "@/lib/revision";
 import { buildSampleContent } from "@/lib/sample-content";
 import type { Course, QuizAnswer } from "@/lib/types";
 
 // Ces tests couvrent des fonctions cachées dans le MVP : on les rallume ici (voir src/lib/features.ts).
 vi.mock("@/lib/features", () => ({
-  features: { assistant: true, suivi: true, planning: true, profilePhoto: true, deleteAccount: true, typicalCourses: false },
+  features: { assistant: true, suivi: true, planning: true, profilePhoto: true, deleteAccount: true, strictValidation: false, typicalCourses: false },
 }));
 
 vi.mock("next/navigation", () => ({
@@ -61,15 +68,21 @@ const course = (over: Partial<Course> = {}): Course => ({
 const read = (key: string) => JSON.parse(window.localStorage.getItem(key) ?? "null");
 const write = (key: string, value: unknown) => window.localStorage.setItem(key, JSON.stringify(value));
 
-function seed(opts: { withContent?: boolean } = {}) {
-  const { withContent = true } = opts;
+function seed(opts: { withContent?: boolean; validated?: boolean } = {}) {
+  const { withContent = true, validated = false } = opts;
   write("plugstudy:demo:user", { uid: UID, email: "honorat@gmail.com", displayName: "Honorat Dossou" });
   write(`plugstudy:demo:profile:${UID}`, { niveau: "Licence 1", filiere: "Informatique", universite: "UAC", langue: "fr" });
   write(`plugstudy:demo:courses:${UID}`, [course()]);
   if (withContent) {
-    write(`plugstudy:demo:col:users/${UID}/courses/c1/notions`, notions);
+    write(`plugstudy:demo:col:users/${UID}/courses/c1/notions`, validated ? notions.map((n) => ({ ...n, validated: true })) : notions);
     write(`plugstudy:demo:col:users/${UID}/courses/c1/questions`, questions);
   }
+}
+
+/** Répond à une question écrite et la fait corriger (sans backend, la correction se fait sur place). */
+async function answerWritten(user: ReturnType<typeof userEvent.setup>, text: string) {
+  await user.type(screen.getByRole("textbox", { name: "Ta réponse" }), text);
+  await user.click(screen.getByRole("button", { name: "Valider ma réponse" }));
 }
 
 beforeEach(() => window.history.pushState({}, "", "/"));
@@ -109,6 +122,58 @@ describe("Règles de révision", () => {
     expect(new Set(picked.map((q) => q.notionId))).toEqual(new Set(questions.map((q) => q.notionId)));
     expect(picked[0].notionId).toBe(sessionNotions(notions)[0].id);
     expect(picked.length).toBeLessThanOrEqual(12);
+  });
+
+  it("le quiz général finit par trois questions écrites sur les notions les plus importantes", () => {
+    const picked = generalQuizQuestions(questions, notions);
+    const written = picked.filter((question) => question.kind === "written");
+    expect(written).toHaveLength(3);
+    expect(picked.slice(-3)).toEqual(written);
+    expect(written[0].notionId).toBe(sessionNotions(notions)[0].id);
+    expect(generalQuizQuestions([], notions)).toEqual([]);
+  });
+
+  it("chaque nouvelle tentative du quiz général prend d'autres questions", () => {
+    const base = questions.find((question) => question.notionId === "complexite")!;
+    const three = [1, 2, 3].map((n) => ({ ...base, id: `q-complexite-${n}`, text: `Question ${n}` }));
+    const ids = (round: number) =>
+      generalQuizQuestions(three, notions.filter((n) => n.id === "complexite"), round)
+        .filter((question) => question.kind !== "written")
+        .map((question) => question.id);
+    expect(ids(0)).toEqual(["q-complexite-1", "q-complexite-2"]);
+    expect(ids(1)).toEqual(["q-complexite-2", "q-complexite-3"]);
+    expect(ids(2)).toEqual(["q-complexite-3", "q-complexite-1"]);
+  });
+
+  it("valide à partir de 75 %", () => {
+    expect(isPassed(3, 4)).toBe(true);
+    expect(isPassed(9, 12)).toBe(true);
+    expect(isPassed(2, 3)).toBe(false);
+    expect(isPassed(0, 0)).toBe(false);
+  });
+
+  it("le quiz d'une notion ajoute une question écrite, sauf quand la notion n'a aucune question", () => {
+    const notion = notions.find((n) => n.id === "complexite")!;
+    const quiz = notionQuiz(questions, notion);
+    expect(quiz.at(-1)).toEqual(writtenQuestion(notion));
+    expect(quiz.at(-1)!.kind).toBe("written");
+    expect(notionQuiz([], notion)).toEqual([]);
+  });
+
+  it("le quiz général reste verrouillé tant qu'une notion indispensable n'est pas validée", () => {
+    const required = sessionNotions(notions);
+    expect(generalUnlocked(notions)).toBe(false);
+    expect(pendingNotions(notions).map((n) => n.id)).toEqual(required.map((n) => n.id));
+    const almost = notions.map((n) => ({ ...n, validated: n.id !== required[0].id ? true : undefined }));
+    expect(pendingNotions(almost).map((n) => n.id)).toEqual([required[0].id]);
+    expect(generalUnlocked(notions.map((n) => ({ ...n, validated: true })))).toBe(true);
+    expect(generalUnlocked([])).toBe(false);
+  });
+
+  it("corrige une réponse écrite par les mots du cours quand l'IA ne répond pas", () => {
+    const notion = { title: "Complexité algorithmique", simple: "Plus il y a de données, plus ça prend du temps.", excerpt: "" };
+    expect(localGrade("La complexité algorithmique mesure le temps quand il y a plus de données", notion).correct).toBe(true);
+    expect(localGrade("Je ne sais pas", notion).correct).toBe(false);
   });
 
   it("donne les messages de résultat et de suivi", () => {
@@ -223,7 +288,7 @@ describe("Séance de révision (écran 19)", () => {
 
 describe("Quiz (écran 20) puis résultat (écran 26)", () => {
   it("le quiz général enregistre le résultat, met à jour la maîtrise et la progression", async () => {
-    seed();
+    seed({ validated: true });
     const user = userEvent.setup();
     wrap(<QuizPage />);
     const asked = generalQuizQuestions(questions, notions);
@@ -231,17 +296,26 @@ describe("Quiz (écran 20) puis résultat (écran 26)", () => {
     expect(screen.getByText("Quiz général")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Choisis une réponse" }).hasAttribute("disabled")).toBe(true);
 
+    const given: QuizAnswer[] = [];
     for (const [index, question] of asked.entries()) {
       expect(await screen.findByText(`Question ${index + 1} sur ${asked.length}`)).toBeTruthy();
       expect(screen.getByRole("heading", { name: question.text })).toBeTruthy();
-      // La première question : une mauvaise réponse, avec « Pourquoi ce n'est pas … » ; les autres : la bonne.
-      const choice = index === 0 ? question.choices[(question.correctIndex + 1) % question.choices.length] : question.choices[question.correctIndex];
-      await user.click(screen.getByText(choice));
-      if (index === 0) {
-        expect(await screen.findByText(/Pourquoi ce n’est pas/)).toBeTruthy();
-        expect(screen.getByText("Ta réponse")).toBeTruthy();
+      const notion = notions.find((n) => n.id === question.notionId)!;
+      let correct = true;
+      if (question.kind === "written") {
+        await answerWritten(user, `${notion.title} ${notion.simple}`);
+        expect(await screen.findByText("Bien vu")).toBeTruthy();
+      } else {
+        // La première question : une mauvaise réponse, avec « Pourquoi ce n'est pas … » ; les autres : la bonne.
+        correct = index !== 0;
+        await user.click(screen.getByText(correct ? question.choices[question.correctIndex] : question.choices[(question.correctIndex + 1) % question.choices.length]));
+        if (index === 0) {
+          expect(await screen.findByText(/Pourquoi ce n’est pas/)).toBeTruthy();
+          expect(screen.getByText("Ta réponse")).toBeTruthy();
+        }
       }
-      await user.click(screen.getByRole("button", { name: index === asked.length - 1 ? "Voir mon résultat" : "Question suivante" }));
+      given.push({ questionId: question.id, notionId: question.notionId, notionTitle: notion.title, source: question.source, correct });
+      await user.click(await screen.findByRole("button", { name: index === asked.length - 1 ? "Voir mon résultat" : "Question suivante" }));
     }
 
     await waitFor(() => expect(router.push).toHaveBeenCalled());
@@ -249,13 +323,28 @@ describe("Quiz (écran 20) puis résultat (écran 26)", () => {
 
     const attempts = read(`plugstudy:demo:col:users/${UID}/attempts`);
     expect(attempts).toHaveLength(1);
-    expect(attempts[0]).toMatchObject({ score: asked.length - 1, total: asked.length, courseName: "Algorithmique" });
+    expect(attempts[0]).toMatchObject({ score: asked.length - 1, total: asked.length, courseName: "Algorithmique", kind: "general" });
+    expect(attempts[0].answers.filter((answer: QuizAnswer) => answer.written)).toHaveLength(3);
+    expect(attempts[0].answers[0].advice).toBeTruthy(); // le conseil de la question ratée
     const saved = read(`plugstudy:demo:col:users/${UID}/courses/c1/notions`);
-    expect(saved.find((n: { id: string }) => n.id === asked[0].notionId).mastery).toBe(0);
-    expect(saved.find((n: { id: string }) => n.id === asked[1].notionId).mastery).toBe(0.5);
+    for (const expected of applyQuiz(notions, given).notions) {
+      expect(saved.find((n: { id: string }) => n.id === expected.id).mastery).toBe(expected.mastery);
+    }
     const [stored] = read(`plugstudy:demo:courses:${UID}`);
     expect(stored.progress).toBeGreaterThan(0);
     expect(stored.lastStudiedAt).not.toBeNull();
+    expect(stored.validated).toBe(true); // 10 sur 11 : au moins 75 %, le cours est validé
+  }, 40000);
+
+  it("verrouille le quiz général tant que les notions indispensables ne sont pas validées", async () => {
+    seed();
+    wrap(<QuizPage />);
+    expect(await screen.findByText("Valide d’abord les notions indispensables")).toBeTruthy();
+    expect(screen.getByText("Verrouillé")).toBeTruthy();
+    const first = sessionNotions(notions)[0];
+    const link = screen.getByRole("link", { name: new RegExp(first.title) });
+    expect(link.getAttribute("href")).toBe(`/cours/c1/seance?notion=${first.id}`);
+    expect(screen.queryByText(/Question 1 sur/)).toBeNull();
   });
 
   it("affiche le résultat : score, réponses et notion à revoir", async () => {
@@ -434,26 +523,62 @@ describe("Un quiz par notion", () => {
     await waitFor(() => expect(router.push).toHaveBeenCalledWith(`/cours/c1/quiz?notion=${first.id}`));
   });
 
-  it("le quiz ne pose que les questions de la notion révisée", async () => {
+  const complexite = notions.find((notion) => notion.id === "complexite")!;
+
+  async function playNotionQuiz(user: ReturnType<typeof userEvent.setup>, goodChoices: number, writtenText: string) {
+    for (let n = 1; n <= 3; n++) {
+      await screen.findByText(new RegExp(`Question ${n} sur 4`));
+      const right = base.choices[base.correctIndex];
+      const wrong = base.choices[(base.correctIndex + 1) % base.choices.length];
+      await user.click(screen.getByText(n <= goodChoices ? right : wrong));
+      await user.click(screen.getByRole("button", { name: "Question suivante" }));
+    }
+    await screen.findByText(/Question 4 sur 4/);
+    await answerWritten(user, writtenText);
+    await user.click(await screen.findByRole("button", { name: "Voir mon résultat" }));
+    await waitFor(() => expect(router.push).toHaveBeenCalled());
+  }
+
+  it("le quiz ne pose que les questions de la notion révisée, puis une question écrite", async () => {
     withExtra();
     window.history.pushState({}, "", "/?notion=complexite");
     const user = userEvent.setup();
     wrap(<QuizPage />);
-    expect(await screen.findByText(/Question 1 sur 3/)).toBeTruthy(); // 4 questions sur la notion, 3 retenues
+    expect(await screen.findByText(/Question 1 sur 4/)).toBeTruthy(); // 3 questions à choix retenues sur 4, puis une écrite
     expect(screen.getByText("Quiz sur la notion")).toBeTruthy();
-    expect(screen.getByText(/Complexité algorithmique · Question 1 sur 3/)).toBeTruthy();
+    expect(screen.getByText(/Complexité algorithmique · Question 1 sur 4/)).toBeTruthy();
     expect(screen.getByRole("heading", { name: base.text })).toBeTruthy();
 
-    for (let n = 1; n <= 3; n++) {
-      await screen.findByText(new RegExp(`Question ${n} sur 3`));
-      await user.click(screen.getByText(base.choices[base.correctIndex]));
-      await user.click(screen.getByRole("button", { name: n === 3 ? "Voir mon résultat" : "Question suivante" }));
-    }
-    await waitFor(() => expect(router.push).toHaveBeenCalled());
+    await playNotionQuiz(user, 3, `${complexite.title} ${complexite.simple}`);
     expect(router.push.mock.calls[0][0]).toMatch(/^\/cours\/c1\/resultat\?tentative=.+&notion=complexite$/);
     const [attempt] = read(`plugstudy:demo:col:users/${UID}/attempts`);
-    expect(attempt.total).toBe(3);
+    expect(attempt).toMatchObject({ total: 4, score: 4, kind: "notion" });
     expect(attempt.answers.every((answer: QuizAnswer) => answer.notionId === "complexite")).toBe(true);
+    expect(attempt.answers[3].written).toBe(true);
+  });
+
+  it("valide la notion à partir de 75 %", async () => {
+    withExtra();
+    window.history.pushState({}, "", "/?notion=complexite");
+    const user = userEvent.setup();
+    wrap(<QuizPage />);
+    await playNotionQuiz(user, 3, "Je ne sais pas"); // 3 sur 4 : 75 %
+    const saved = read(`plugstudy:demo:col:users/${UID}/courses/c1/notions`);
+    expect(saved.find((n: { id: string }) => n.id === "complexite").validated).toBe(true);
+  });
+
+  it("ne valide pas la notion sous 75 % et garde un conseil pour chaque erreur", async () => {
+    withExtra();
+    window.history.pushState({}, "", "/?notion=complexite");
+    const user = userEvent.setup();
+    wrap(<QuizPage />);
+    await playNotionQuiz(user, 2, "Je ne sais pas"); // 2 sur 4 : 50 %
+    const saved = read(`plugstudy:demo:col:users/${UID}/courses/c1/notions`);
+    expect(saved.find((n: { id: string }) => n.id === "complexite").validated).toBeUndefined();
+    const [attempt] = read(`plugstudy:demo:col:users/${UID}/attempts`);
+    const wrong = attempt.answers.filter((answer: QuizAnswer) => !answer.correct);
+    expect(wrong).toHaveLength(2);
+    expect(wrong.every((answer: QuizAnswer) => answer.advice)).toBe(true);
   });
 
   it("une notion sans question passe à la suivante au lieu de bloquer", async () => {
@@ -489,7 +614,7 @@ describe("Un quiz par notion", () => {
   });
 
   it("le résultat de la dernière notion propose le quiz général, et revoir si besoin", async () => {
-    seed();
+    seed({ validated: true });
     const session = sessionNotions(notions);
     const last = session[session.length - 1];
     write(`plugstudy:demo:col:users/${UID}/attempts`, [attemptOn(last.id, false)]);
@@ -499,5 +624,66 @@ describe("Un quiz par notion", () => {
     expect(screen.queryByRole("link", { name: "Notion suivante" })).toBeNull();
     expect(screen.getByRole("link", { name: "Passer au quiz général" }).getAttribute("href")).toBe("/cours/c1/quiz");
     expect(screen.getByRole("link", { name: "Terminer" })).toBeTruthy();
+  });
+
+  it("un cadenas remplace le quiz général tant que des notions restent à valider", async () => {
+    seed();
+    const session = sessionNotions(notions);
+    const last = session[session.length - 1];
+    write(`plugstudy:demo:col:users/${UID}/attempts`, [attemptOn(last.id, true)]);
+    window.history.pushState({}, "", `/?tentative=t1&notion=${last.id}`);
+    wrap(<ResultatPage />);
+    expect((await screen.findByRole("link", { name: "Notions à valider" })).getAttribute("href")).toBe("/cours/c1/quiz");
+    expect(screen.queryByRole("link", { name: "Passer au quiz général" })).toBeNull();
+  });
+
+  it("notion réussie : elle est validée et on passe à la suivante", async () => {
+    seed();
+    const session = sessionNotions(notions);
+    write(`plugstudy:demo:col:users/${UID}/attempts`, [attemptOn(session[0].id, true)]);
+    window.history.pushState({}, "", `/?tentative=t1&notion=${session[0].id}`);
+    wrap(<ResultatPage />);
+    expect(await screen.findByText("Notion validée")).toBeTruthy();
+    const links = screen.getAllByRole("link").map((link) => link.textContent);
+    expect(links.indexOf("Notion suivante")).toBeLessThan(links.indexOf("Terminer")); // « Notion suivante » vient en premier, mis en avant
+  });
+
+  it("notion ratée : renvoyée à la notion avec un conseil, sans bloquer le passage", async () => {
+    seed();
+    const session = sessionNotions(notions);
+    write(`plugstudy:demo:col:users/${UID}/attempts`, [
+      {
+        ...attemptOn(session[0].id, false),
+        kind: "notion",
+        answers: [
+          { questionId: "q", notionId: session[0].id, notionTitle: "La notion", source: "Algorithmique, p. 1", correct: false, advice: "Tu as confondu la pile et la file." },
+        ],
+      },
+    ]);
+    window.history.pushState({}, "", `/?tentative=t1&notion=${session[0].id}`);
+    wrap(<ResultatPage />);
+    expect(await screen.findByText("Notion pas encore validée")).toBeTruthy();
+    expect(screen.getByText("Un conseil")).toBeTruthy();
+    expect(screen.getByText("Tu as confondu la pile et la file.")).toBeTruthy();
+    const links = screen.getAllByRole("link").map((link) => link.textContent);
+    expect(links).toContain("Notion suivante"); // validation souple : on peut quand même avancer
+    expect(links.indexOf("Revoir la notion")).toBeLessThan(links.indexOf("Notion suivante")); // d'abord la notion à revoir
+  });
+
+  it("quiz général raté : on peut le refaire, avec une nouvelle tentative", async () => {
+    seed({ validated: true });
+    write(`plugstudy:demo:col:users/${UID}/attempts`, [{ ...attemptOn("piles", false), kind: "general" }]);
+    window.history.pushState({}, "", "/?tentative=t1");
+    wrap(<ResultatPage />);
+    expect(await screen.findByText("Cours pas encore validé")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Refaire le quiz général" }).getAttribute("href")).toBe("/cours/c1/quiz?essai=1");
+  });
+
+  it("une nouvelle tentative du quiz général reformule les questions et en change", async () => {
+    seed({ validated: true });
+    window.history.pushState({}, "", "/?essai=1");
+    wrap(<QuizPage />);
+    const asked = generalQuizQuestions(questions, notions, 1);
+    expect(await screen.findByText(`Question 1 sur ${asked.length}`)).toBeTruthy();
   });
 });

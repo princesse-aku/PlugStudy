@@ -6,14 +6,14 @@ import { Suspense, useState, type FormEvent } from "react";
 import { Button } from "@/components/Button";
 import { ProgressBar } from "@/components/CourseCard";
 import { DemoBanner } from "@/components/DemoBanner";
-import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, MessageIcon, SendIcon } from "@/components/Icons";
+import { CheckIcon, ChevronLeftIcon, ChevronRightIcon, LockIcon, MessageIcon, SendIcon } from "@/components/Icons";
 import { ImportanceBadge, Notice } from "@/components/Revision";
 import { Screen } from "@/components/Screen";
 import { useAttempts, useMessages, useNotions, usePlans, seedSampleContent } from "@/lib/data";
 import { plannedQuizzes, sessionTitle, weekdayShortDate, type PlannedQuiz } from "@/lib/planning";
 import { averageQuizScore, courseSubtitle, errorMessage, notionsToStrengthen, prepSteps, recentConversations, starterQuestions } from "@/lib/detail";
 import { useI18n } from "@/lib/i18n";
-import { importanceOf, rankNotions } from "@/lib/revision";
+import { generalUnlocked, importanceOf, rankNotions } from "@/lib/revision";
 import { features } from "@/lib/features";
 import { sampleContentAvailable } from "@/lib/sample-content";
 import { dayLabel, relativeTime, shortDateOf } from "@/lib/time";
@@ -70,6 +70,8 @@ function Detail() {
   const quizHref = ({ session }: PlannedQuiz) =>
     session.kind === "quiz" ? `/cours/${id}/quiz?${session.unit === "chapter" ? "chapitre" : "partie"}=${session.from}` : `/cours/${id}/quiz`;
   const nextQuiz = planned[0];
+  // Le quiz général reste verrouillé tant que les notions indispensables ne sont pas validées (75 % à chaque quiz de notion).
+  const generalLocked = (!nextQuiz || nextQuiz.session.kind !== "quiz") && notions.length > 0 && !generalUnlocked(notions);
 
   const go = (name: Tab) => `/cours/${id}${name === "fiche" ? "" : `?onglet=${name}`}`;
 
@@ -388,11 +390,18 @@ function Detail() {
             </Button>
           ) : tab === "quiz" ? (
             <Link href={nextQuiz ? quizHref(nextQuiz) : `/cours/${id}/quiz`} className={cta}>
-              {!nextQuiz
-                ? t("Lancer un quiz")
-                : nextQuiz.session.kind === "quiz"
-                  ? t("Lancer le quiz {n}", { n: nextQuiz.session.from })
-                  : t("Lancer le quiz général")}
+              {generalLocked ? (
+                <span className="flex items-center justify-center gap-2">
+                  <LockIcon size={20} />
+                  {t("Quiz général verrouillé")}
+                </span>
+              ) : !nextQuiz ? (
+                t("Lancer un quiz")
+              ) : nextQuiz.session.kind === "quiz" ? (
+                t("Lancer le quiz {n}", { n: nextQuiz.session.from })
+              ) : (
+                t("Lancer le quiz général")
+              )}
             </Link>
           ) : (
             <Link href={`/cours/${id}/seance`} className={cta}>

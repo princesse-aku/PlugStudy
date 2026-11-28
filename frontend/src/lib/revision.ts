@@ -69,18 +69,78 @@ export function nextNotionId(notions: Notion[], currentId: string): string | nul
 
 export const GENERAL_PER_NOTION = 2;
 export const GENERAL_MAX_QUESTIONS = 12;
+/** Questions écrites du quiz général (les notions les mieux classées d'abord) ; les autres sont des choix. */
+export const GENERAL_WRITTEN = 3;
+/** Score minimal pour valider une notion (quiz de la notion) ou le cours (quiz général). */
+export const PASS_PERCENT = 75;
+
+export function isPassed(score: number, total: number): boolean {
+  return total > 0 && scorePercent(score, total) >= PASS_PERCENT;
+}
+
+/** Question écrite sur une notion : l'étudiant explique avec ses mots, l'IA compare au passage du cours. */
+export function writtenQuestion(notion: Notion, lang: Lang = "fr"): Question {
+  return {
+    id: `w-${notion.id}`,
+    notionId: notion.id,
+    text: translate("Explique avec tes propres mots : « {title} »", lang, { title: notion.title }),
+    choices: [],
+    correctIndex: -1,
+    explanation: notion.simple,
+    source: notion.source,
+    kind: "written",
+  };
+}
+
+/** Quiz d'une notion : ses questions à choix, puis une question écrite. Vide quand la notion n'a pas de questions. */
+export function notionQuiz(questions: Question[], notion: Notion, lang: Lang = "fr"): Question[] {
+  const choices = notionQuestions(questions, notion.id);
+  return choices.length > 0 ? [...choices, writtenQuestion(notion, lang)] : [];
+}
 
 /**
- * Quiz général de fin de cours : les questions de toutes les notions, une question de chaque notion d'abord (les mieux
- * classées en tête), puis une seconde par notion tant que la limite n'est pas atteinte.
+ * Questions à choix d'un quiz portant sur plusieurs notions : une de chaque notion d'abord (les mieux classées en tête), puis
+ * une seconde. `round` : numéro de la tentative (0 = la première) ; chaque tentative prend d'autres questions de chaque notion.
  */
-export function generalQuizQuestions(questions: Question[], notions: Notion[]): Question[] {
-  const lists = rankNotions(notions).map((notion) => notionQuestions(questions, notion.id, GENERAL_PER_NOTION));
+export function choiceQuizQuestions(questions: Question[], notions: Notion[], round = 0): Question[] {
+  const lists = rankNotions(notions).map((notion) => {
+    const all = notionQuestions(questions, notion.id);
+    const start = all.length > 0 ? round % all.length : 0;
+    return [...all.slice(start), ...all.slice(0, start)].slice(0, GENERAL_PER_NOTION);
+  });
   const picked: Question[] = [];
-  for (let round = 0; round < GENERAL_PER_NOTION; round++) {
-    for (const list of lists) if (list[round]) picked.push(list[round]);
+  for (let turn = 0; turn < GENERAL_PER_NOTION; turn++) {
+    for (const list of lists) if (list[turn]) picked.push(list[turn]);
   }
   return picked.slice(0, GENERAL_MAX_QUESTIONS);
+}
+
+/**
+ * Quiz général de fin de cours (12 questions au plus) : des questions à choix sur toutes les notions, puis trois questions
+ * écrites sur les notions les plus importantes. Chaque nouvelle tentative (`round`) prend d'autres questions.
+ */
+export function generalQuizQuestions(questions: Question[], notions: Notion[], round = 0, lang: Lang = "fr"): Question[] {
+  const choices = choiceQuizQuestions(questions, notions, round);
+  if (choices.length === 0) return [];
+  const written = rankNotions(notions).slice(0, GENERAL_WRITTEN).map((notion) => writtenQuestion(notion, lang));
+  return [...choices.slice(0, GENERAL_MAX_QUESTIONS - written.length), ...written];
+}
+
+/** Notions qu'il faut avoir validées (au moins 75 %) avant le quiz général : les indispensables. */
+export function pendingNotions(notions: Notion[]): Notion[] {
+  return sessionNotions(notions).filter((notion) => !notion.validated);
+}
+
+export const generalUnlocked = (notions: Notion[]): boolean => notions.length > 0 && pendingNotions(notions).length === 0;
+
+/** Correction de secours d'une réponse écrite quand l'IA ne répond pas : l'idée du passage est-elle reprise avec d'autres mots ? */
+export function localGrade(answer: string, notion: Pick<Notion, "title" | "simple" | "excerpt">): { correct: boolean; feedback: string } {
+  const words = (text: string) => [...new Set(normalize(text).split(/[^a-z0-9]+/).filter((word) => word.length >= 4))];
+  const wanted = words(`${notion.title} ${notion.simple ?? ""}`).slice(0, 10);
+  const given = new Set(words(answer));
+  const hits = wanted.filter((word) => given.has(word)).length;
+  const correct = wanted.length > 0 && hits / Math.min(wanted.length, 6) >= 0.4;
+  return { correct, feedback: notion.simple };
 }
 
 export function scorePercent(score: number, total: number): number {

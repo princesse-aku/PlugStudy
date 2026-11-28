@@ -52,6 +52,7 @@ describe("Réglages du MVP", () => {
       planning: true,
       profilePhoto: false,
       deleteAccount: false,
+      strictValidation: false,
       typicalCourses: false,
     });
   });

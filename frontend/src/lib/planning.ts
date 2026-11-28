@@ -1,5 +1,5 @@
 import { localeOf, translate, type Lang } from "@/lib/i18n/translate";
-import { generalQuizQuestions, rankNotions } from "@/lib/revision";
+import { choiceQuizQuestions, rankNotions } from "@/lib/revision";
 import type { Course, Notion, Plan, PlanSession, Question } from "@/lib/types";
 
 /**
@@ -326,7 +326,7 @@ export function unitNotions(notions: Notion[], unit: PlanSession["unit"], n: num
 
 /** Questions du « quiz n » du planning : celles des notions du chapitre (ou de la partie) n. */
 export const unitQuizQuestions = (questions: Question[], notions: Notion[], unit: PlanSession["unit"], n: number): Question[] =>
-  generalQuizQuestions(questions, unitNotions(notions, unit, n));
+  choiceQuizQuestions(questions, unitNotions(notions, unit, n));
 
 export interface PlannedQuiz {
   session: PlanSession;

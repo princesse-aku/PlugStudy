@@ -544,3 +544,51 @@ class TestQuizParNotion:
         doc, built = self.built(settings, 3)
         with pytest.raises(AIError):
             generate_questions(FakeAI(fail=True), built, doc, settings)
+
+
+class TestReponsesEcritesEtReformulation:
+    def seed(self, store):
+        store.set(course_path(UID, COURSE_ID, "notions", "n1"), {"title": "Boucles", "excerpt": "Une boucle répète.", "simple": "On refait."})
+        store.set(course_path(UID, COURSE_ID, "questions", "q-n1-1"), {"text": "Que fait une boucle ?", "notionId": "n1"})
+        store.set(course_path(UID, COURSE_ID, "questions", "q-n1-2"), {"text": "Quand une boucle s'arrête-t-elle ?", "notionId": "n1"})
+
+    def test_corrige_une_bonne_reponse(self, client, store):
+        self.seed(store)
+        reply = client.post(f"/courses/{COURSE_ID}/grade", json={"notionId": "n1", "answer": "bonne idee"})
+        assert reply.status_code == 200
+        assert reply.json() == {"correct": True, "feedback": "Idée juste."}
+
+    def test_corrige_une_mauvaise_reponse(self, client, store):
+        self.seed(store)
+        reply = client.post(f"/courses/{COURSE_ID}/grade", json={"notionId": "n1", "answer": "je ne sais pas"})
+        assert reply.json()["correct"] is False
+
+    def test_correction_refuse_une_notion_inconnue_ou_une_reponse_vide(self, client, store):
+        self.seed(store)
+        assert client.post(f"/courses/{COURSE_ID}/grade", json={"notionId": "zzz", "answer": "x"}).status_code == 404
+        assert client.post(f"/courses/{COURSE_ID}/grade", json={"notionId": "n1", "answer": ""}).status_code == 422
+
+    def test_correction_indisponible_quand_l_ia_tombe(self, client, store):
+        self.seed(store)
+        app.dependency_overrides[get_ai] = lambda: FakeAI(fail=True)
+        reply = client.post(f"/courses/{COURSE_ID}/grade", json={"notionId": "n1", "answer": "bonne idee"})
+        assert reply.status_code == 503
+
+    def test_ne_corrige_pas_le_cours_d_un_autre_etudiant(self, client, store):
+        store.set(course_path("autre", "c9"), {"name": "Secret"})
+        store.set(course_path("autre", "c9", "notions", "n1"), {"title": "Secret"})
+        assert client.post("/courses/c9/grade", json={"notionId": "n1", "answer": "bonne idee"}).status_code == 404
+
+    def test_reformule_les_questions_sans_toucher_aux_reponses(self, client, store):
+        self.seed(store)
+        reply = client.post(f"/courses/{COURSE_ID}/rephrase", json={"questionIds": ["q-n1-1", "q-n1-2"]})
+        assert reply.status_code == 200
+        assert reply.json()["texts"] == {
+            "q-n1-1": "Autrement dit : Que fait une boucle ?",
+            "q-n1-2": "Autrement dit : Quand une boucle s'arrête-t-elle ?",
+        }
+        assert store.get(course_path(UID, COURSE_ID, "questions", "q-n1-1"))["text"] == "Que fait une boucle ?"
+
+    def test_reformulation_refuse_des_questions_inconnues(self, client, store):
+        self.seed(store)
+        assert client.post(f"/courses/{COURSE_ID}/rephrase", json={"questionIds": ["nope"]}).status_code == 404

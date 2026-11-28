@@ -23,7 +23,7 @@ from app.ai import AIClient, AIError, RodiumClient
 from app.auth import current_uid, get_store
 from app.config import Settings, get_settings
 from app.extract import ALLOWED_EXTENSIONS, extension_of
-from app.generate import answer_question, not_found_message
+from app.generate import answer_question, grade_written_answer, not_found_message, rephrase_questions
 from app.pipeline import process_course
 from app.recovery import recover_in_background
 from app.retrieval import top_by_embedding, top_by_words
@@ -44,6 +44,24 @@ def get_ai() -> AIClient:
 
 class AssistantRequest(BaseModel):
     question: str = Field(min_length=2, max_length=500)
+
+
+class GradeRequest(BaseModel):
+    notionId: str = Field(min_length=1, max_length=64)
+    answer: str = Field(min_length=1, max_length=1500)
+
+
+class GradeReply(BaseModel):
+    correct: bool
+    feedback: str
+
+
+class RephraseRequest(BaseModel):
+    questionIds: list[str] = Field(min_length=1, max_length=12)
+
+
+class RephraseReply(BaseModel):
+    texts: dict[str, str]
 
 
 class AssistantReply(BaseModel):
@@ -158,3 +176,57 @@ def assistant(
     except AIError:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "L'assistant est momentanément indisponible.") from None
     return AssistantReply(**reply)
+
+
+@app.post("/courses/{course_id}/grade", response_model=GradeReply)
+def grade(
+    course_id: str,
+    body: GradeRequest,
+    uid: str = Depends(current_uid),
+    store: Store = Depends(get_store),
+    ai: AIClient = Depends(get_ai),
+) -> GradeReply:
+    """Corrige la réponse écrite d'un étudiant à une notion (comparée au passage du cours)."""
+    course_id = _valid_course_id(course_id)
+    course = store.get(course_path(uid, course_id))
+    if course is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Cours introuvable.")
+    if not COURSE_ID.match(body.notionId):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Notion introuvable.")
+    notion = store.get(course_path(uid, course_id, "notions", body.notionId))
+    if notion is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Notion introuvable.")
+    try:
+        reply = grade_written_answer(ai, notion, body.answer, "en" if course.get("language") == "en" else "fr")
+    except AIError:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "La correction est momentanément indisponible.") from None
+    return GradeReply(**reply)
+
+
+@app.post("/courses/{course_id}/rephrase", response_model=RephraseReply)
+def rephrase(
+    course_id: str,
+    body: RephraseRequest,
+    uid: str = Depends(current_uid),
+    store: Store = Depends(get_store),
+    ai: AIClient = Depends(get_ai),
+) -> RephraseReply:
+    """Reformule des questions du quiz (nouvelle tentative) : mêmes réponses, autres mots."""
+    course_id = _valid_course_id(course_id)
+    course = store.get(course_path(uid, course_id))
+    if course is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Cours introuvable.")
+    questions: list[dict] = []
+    for question_id in dict.fromkeys(body.questionIds):
+        if not COURSE_ID.match(question_id):
+            continue
+        question = store.get(course_path(uid, course_id, "questions", question_id))
+        if question and isinstance(question.get("text"), str):
+            questions.append({"id": question_id, "text": question["text"]})
+    if not questions:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Questions introuvables.")
+    try:
+        texts = rephrase_questions(ai, questions, "en" if course.get("language") == "en" else "fr")
+    except AIError:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "La reformulation est momentanément indisponible.") from None
+    return RephraseReply(texts=texts)

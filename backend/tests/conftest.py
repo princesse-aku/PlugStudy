@@ -79,6 +79,12 @@ class FakeAI:
                     for aspect in range(1, self.questions_per_notion + 1)
                 ]
             }
+        if system.startswith("Tu corriges"):
+            right = "bonne idee" in user
+            return {"correct": right, "feedback": "Idée juste." if right else "Il manque l'idée principale."}
+        if system.startswith("Tu reformules"):
+            lines = re.findall(r"^(\d+)\. (.+)$", user, flags=re.M)
+            return {"questions": [{"id": int(n), "text": f"Autrement dit : {text}"} for n, text in lines]}
         if system.startswith("Tu es l'assistant"):
             return {"answer": "Une boucle répète des instructions.", "passage": 1}
         raise AssertionError("appel inattendu")

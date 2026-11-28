@@ -56,6 +56,8 @@ export interface Course {
   /** Pourquoi la préparation a échoué (status « error ») : écrit par le backend. */
   /** L'étudiant a fermé l'avis d'échec : le cours ne lui est plus signalé. */
   dismissed?: boolean;
+  /** Cours validé : au moins 75 % au quiz général. */
+  validated?: boolean;
   errorReason?: "format" | "unreadable" | "empty" | "ai" | "failed" | "upload" | "stalled";
 }
 
@@ -77,6 +79,8 @@ export interface Notion {
   position: number;
   /** Maîtrise (M) entre 0 et 1, 0 au départ ; mise à jour après chaque quiz. */
   mastery: number;
+  /** Validée : au moins 75 % au quiz de cette notion. */
+  validated?: boolean;
 }
 
 export interface Question {
@@ -88,6 +92,8 @@ export interface Question {
   /** Explication « Pourquoi ce n'est pas A », avec le passage du cours. */
   explanation: string;
   source: string;
+  /** « written » : l'étudiant écrit sa réponse avec ses mots (corrigée par l'IA) ; par défaut, un choix parmi plusieurs. */
+  kind?: "choice" | "written";
 }
 
 export interface QuizAnswer {
@@ -96,6 +102,10 @@ export interface QuizAnswer {
   notionTitle: string;
   source: string;
   correct: boolean;
+  /** Réponse écrite à la main (et non un choix). */
+  written?: boolean;
+  /** Conseil montré après un quiz raté : pourquoi ça n'a pas marché, en bref. */
+  advice?: string;
 }
 
 export interface Attempt {
@@ -106,6 +116,8 @@ export interface Attempt {
   score: number;
   total: number;
   answers: QuizAnswer[];
+  /** Quiz d'une notion, quiz général de fin de cours, ou quiz d'un chapitre prévu au planning. */
+  kind?: "notion" | "general" | "unit";
 }
 
 /** Temps de révision passé sur une notion (alimente l'activité du Suivi). */

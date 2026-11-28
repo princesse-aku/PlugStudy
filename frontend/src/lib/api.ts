@@ -88,3 +88,39 @@ export async function askAssistant(courseId: string, question: string): Promise<
     return null;
   }
 }
+
+export interface Grade {
+  correct: boolean;
+  feedback: string;
+}
+
+async function postJson(path: string, body: unknown): Promise<unknown | null> {
+  const headers = await authHeaders();
+  if (!headers) return null;
+  try {
+    const response = await fetch(`${apiUrl()}${path}`, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(45_000),
+    });
+    return response.ok ? await response.json() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Correction par l'IA d'une réponse écrite ; null si le backend n'est pas branché ou ne répond pas (le quiz se corrige alors seul). */
+export async function gradeAnswer(courseId: string, notionId: string, answer: string): Promise<Grade | null> {
+  const data = (await postJson(`/courses/${encodeURIComponent(courseId)}/grade`, { notionId, answer })) as Partial<Grade> | null;
+  if (!data || typeof data.correct !== "boolean") return null;
+  return { correct: data.correct, feedback: typeof data.feedback === "string" ? data.feedback : "" };
+}
+
+/** Nouvelle formulation des questions (nouvelle tentative du quiz général) : {id: texte}. Vide si indisponible : on garde les originales. */
+export async function rephraseQuestions(courseId: string, questionIds: string[]): Promise<Record<string, string>> {
+  if (questionIds.length === 0) return {};
+  const data = (await postJson(`/courses/${encodeURIComponent(courseId)}/rephrase`, { questionIds })) as { texts?: unknown } | null;
+  if (!data || typeof data.texts !== "object" || data.texts === null) return {};
+  return Object.fromEntries(Object.entries(data.texts).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+}

@@ -85,4 +85,32 @@ export const EN_REVIEW: Record<string, string> = {
   "Continue comme ça.": "Keep it up.",
   "Très bien !": "Very good!",
   "Garde le rythme.": "Keep up the pace.",
+  // Validation des notions, réponses écrites, quiz général verrouillé
+  "Explique avec tes propres mots : « {title} »": "Explain in your own words: “{title}”",
+  "Écris ta réponse avec tes mots.": "Write your answer in your own words.",
+  "Valider ma réponse": "Check my answer",
+  "Correction…": "Checking…",
+  "Bien vu": "Well done",
+  "Pas tout à fait": "Not quite",
+  "Dans ton cours :": "In your course:",
+  "Verrouillé": "Locked",
+  "Valide d’abord les notions indispensables": "Validate the essential notions first",
+  "Le quiz général s’ouvre quand chaque notion indispensable a obtenu au moins {percent} % à son quiz.":
+    "The general quiz opens once every essential notion has scored at least {percent}% on its quiz.",
+  "Il te reste à valider": "Still to validate",
+  "Réviser": "Review",
+  "Quiz général verrouillé": "General quiz locked",
+  "Notion validée": "Notion validated",
+  "Tu as obtenu au moins {percent} %. Tu peux passer à la suite.": "You scored at least {percent}%. You can move on.",
+  "Notion pas encore validée": "Notion not validated yet",
+  "Il faut au moins {percent} % pour valider une notion. Relis-la, puis réessaie.":
+    "You need at least {percent}% to validate a notion. Read it again, then try again.",
+  "Cours validé": "Course validated",
+  "Bravo : tu maîtrises ce cours.": "Well done: you master this course.",
+  "Cours pas encore validé": "Course not validated yet",
+  "Il faut au moins {percent} % pour valider le cours. Revois les notions ratées, puis refais le quiz.":
+    "You need at least {percent}% to validate the course. Review the notions you missed, then retake the quiz.",
+  "Refaire le quiz général": "Retake the general quiz",
+  "Notions à valider": "Notions to validate",
+  "Un conseil": "A tip",
 };

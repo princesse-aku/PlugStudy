@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { backend } from "@/lib/backend";
-import { applyQuiz, coursePriority } from "@/lib/revision";
+import { applyQuiz, coursePriority, isPassed } from "@/lib/revision";
 import { SAMPLE_SUMMARY, buildSampleContent } from "@/lib/sample-content";
 import { buildPlan, examUrgency, todayISO } from "@/lib/planning";
 import type { AppUser, Attempt, Course, Message, Notion, Plan, Question, QuizAnswer, StudySession } from "@/lib/types";
@@ -112,7 +112,8 @@ export async function saveQuizAttempt(
   user: AppUser,
   course: Course,
   notions: Notion[],
-  answers: QuizAnswer[]
+  answers: QuizAnswer[],
+  kind: "notion" | "general" | "unit" = "unit"
 ): Promise<string> {
   const score = answers.filter((answer) => answer.correct).length;
   const now = Date.now();
@@ -123,16 +124,25 @@ export async function saveQuizAttempt(
     score,
     total: answers.length,
     answers,
+    kind,
   });
   const { notions: updated, progress } = applyQuiz(notions, answers);
   const base = ["users", user.uid, "courses", course.id];
   const touched = new Set(answers.map((answer) => answer.notionId));
+  // Au moins 75 % au quiz d'une notion la valide ; au quiz général, c'est le cours qui est validé.
+  const passed = isPassed(score, answers.length);
   await Promise.all(
     updated
       .filter((notion) => touched.has(notion.id))
-      .map((notion) => backend.setDocument([...base, "notions", notion.id], { mastery: notion.mastery }, true))
+      .map((notion) =>
+        backend.setDocument(
+          [...base, "notions", notion.id],
+          kind === "notion" && passed ? { mastery: notion.mastery, validated: true } : { mastery: notion.mastery },
+          true
+        )
+      )
   );
-  await backend.setDocument(base, { progress, lastStudiedAt: now }, true);
+  await backend.setDocument(base, kind === "general" && passed ? { progress, lastStudiedAt: now, validated: true } : { progress, lastStudiedAt: now }, true);
   return id;
 }
 

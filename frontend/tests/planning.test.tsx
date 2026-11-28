@@ -497,14 +497,21 @@ describe("Quiz prévus", () => {
 
   it("le quiz général accomplit la révision générale du planning", async () => {
     seed({ plan: mockPlan() });
+    // Notions déjà validées : le quiz général est ouvert (2 questions à choix, puis une question écrite par notion).
+    write(`plugstudy:demo:col:users/${UID}/courses/c1/notions`, NOTIONS.map((notion) => ({ ...notion, validated: true })));
     write(`plugstudy:demo:col:users/${UID}/courses/c1/questions`, [question("q1", "n1", "Question 1 ?"), question("q2", "n2", "Question 2 ?")]);
     const user = userEvent.setup();
     wrap(<QuizPage />);
-    expect(await screen.findByText("Question 1 sur 2")).toBeTruthy();
-    for (let n = 1; n <= 2; n++) {
-      await screen.findByText(`Question ${n} sur 2`);
-      await user.click(screen.getByText("Bonne réponse"));
-      await user.click(screen.getByRole("button", { name: n === 2 ? "Voir mon résultat" : "Question suivante" }));
+    expect(await screen.findByText("Question 1 sur 4")).toBeTruthy();
+    for (let n = 1; n <= 4; n++) {
+      await screen.findByText(`Question ${n} sur 4`);
+      if (n <= 2) {
+        await user.click(screen.getByText("Bonne réponse"));
+      } else {
+        await user.type(screen.getByRole("textbox", { name: "Ta réponse" }), "Une réponse avec mes mots");
+        await user.click(screen.getByRole("button", { name: "Valider ma réponse" }));
+      }
+      await user.click(await screen.findByRole("button", { name: n === 4 ? "Voir mon résultat" : "Question suivante" }));
     }
     await waitFor(() => expect(read(`plugstudy:demo:col:users/${UID}/plans`)[0].sessions[4].done).toBe(true));
     expect(read(`plugstudy:demo:col:users/${UID}/plans`)[0].sessions[3].done).toBe(false); // le quiz 2 reste à faire

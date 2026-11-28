@@ -16,6 +16,11 @@ export const features = {
   profilePhoto: false,
   /** « Supprimer mon compte » (écran 31, pas encore construit). */
   deleteAccount: false,
+  /**
+   * Validation stricte : sous 75 % au quiz d'une notion, l'étudiant doit la réviser avant de passer à la suivante.
+   * Désactivée au départ (l'objectif est l'adoption) : le renvoi à la notion est conseillé, le passage reste possible.
+   */
+  strictValidation: false,
   /** Cours types de la filière (catalogue pas encore créé) : un nouvel étudiant démarre sans aucun cours. */
   typicalCourses: false,
 } as const;

@@ -19,7 +19,7 @@ import type { Attempt, Course, Message } from "@/lib/types";
 
 // Ces tests couvrent des fonctions cachées dans le MVP : on les rallume ici (voir src/lib/features.ts).
 vi.mock("@/lib/features", () => ({
-  features: { assistant: true, suivi: true, planning: true, profilePhoto: true, deleteAccount: true, typicalCourses: false },
+  features: { assistant: true, suivi: true, planning: true, profilePhoto: true, deleteAccount: true, strictValidation: false, typicalCourses: false },
 }));
 
 vi.mock("next/navigation", () => ({
@@ -195,7 +195,16 @@ describe("Détail du cours : Quiz (écran 16)", () => {
     expect(screen.getByRole("link", { name: /Quiz de fin de séance/ }).getAttribute("href")).toBe("/cours/c1/resultat?tentative=t1");
     expect(await screen.findByText("À renforcer")).toBeTruthy();
     expect(await screen.findByText("Piles et files")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Lancer un quiz" }).getAttribute("href")).toBe("/cours/c1/quiz");
+    // Aucune notion n'est validée : le quiz général est verrouillé (le lien ouvre l'explication du cadenas).
+    expect(screen.getByRole("link", { name: "Quiz général verrouillé" }).getAttribute("href")).toBe("/cours/c1/quiz");
+  });
+
+  it("ouvre le quiz général quand les notions indispensables sont validées", async () => {
+    seed();
+    write(`plugstudy:demo:col:users/${UID}/courses/c1/notions`, notions.map((n) => ({ ...n, validated: true })));
+    window.history.pushState({}, "", "/?onglet=quiz");
+    wrap(<CoursDetailPage />);
+    expect((await screen.findByRole("link", { name: "Lancer un quiz" })).getAttribute("href")).toBe("/cours/c1/quiz");
   });
 
   it("invite à faire un premier quiz", async () => {

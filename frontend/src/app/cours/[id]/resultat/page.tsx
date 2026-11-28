@@ -10,7 +10,7 @@ import { Screen } from "@/components/Screen";
 import { useAttempts, useNotions } from "@/lib/data";
 import { features } from "@/lib/features";
 import { useI18n } from "@/lib/i18n";
-import { nextNotionId, resultTitle, scorePercent, wrongAnswers } from "@/lib/revision";
+import { PASS_PERCENT, generalUnlocked, isPassed, nextNotionId, resultTitle, scorePercent, wrongAnswers } from "@/lib/revision";
 import { useCourseScreen } from "@/lib/use-courses";
 
 const linkPrimary =
@@ -44,14 +44,56 @@ function Resultat() {
   const percent = scorePercent(attempt.score, attempt.total);
   const wrong = wrongAnswers(attempt.answers);
   const first = wrong[0];
+  const kind = attempt.kind ?? (notionId ? "notion" : "general");
+  const passed = isPassed(attempt.score, attempt.total);
   const next = notionId ? nextNotionId(notions, notionId) : null;
-  // Les boutons, dans l'ordre : revoir ce qui a été raté, passer à la notion suivante, terminer. Le premier est mis en avant.
+  const generalRound = attempts.filter((item) => item.courseId === id && item.kind === "general").length; // tentatives déjà faites
+  const review = first ? { href: `/cours/${id}/seance?notion=${first.notionId}`, label: t("Revoir la notion") } : null;
+  // Après une notion : la suivante ; après la dernière, le quiz général (verrouillé tant que les indispensables ne sont pas validées).
+  const onward = next
+    ? { href: `/cours/${id}/seance?notion=${next}`, label: t("Notion suivante") }
+    : notionId
+      ? { href: `/cours/${id}/quiz`, label: generalUnlocked(notions) ? t("Passer au quiz général") : t("Notions à valider") }
+      : null;
+
+  // Les boutons, dans l'ordre ; le premier est mis en avant.
+  // Notion validée : on avance. Sous 75 % : on est renvoyé à la notion (et on peut quand même avancer tant que la validation n'est pas stricte).
   const actions: { href: string; label: string }[] = [];
-  if (first) actions.push({ href: `/cours/${id}/seance?notion=${first.notionId}`, label: t("Revoir la notion") });
-  if (next) actions.push({ href: `/cours/${id}/seance?notion=${next}`, label: t("Notion suivante") });
-  // Toutes les notions sont faites : le quiz général, avec les questions de tout le cours, vient en dernier.
-  else if (notionId) actions.push({ href: `/cours/${id}/quiz`, label: t("Passer au quiz général") });
+  if (kind === "notion") {
+    if (passed) {
+      if (onward) actions.push(onward);
+      if (review) actions.push(review);
+    } else {
+      if (review) actions.push(review);
+      if (onward && !features.strictValidation) actions.push(onward);
+    }
+  } else if (kind === "general") {
+    if (review) actions.push(review);
+    if (!passed) actions.push({ href: `/cours/${id}/quiz?essai=${generalRound}`, label: t("Refaire le quiz général") });
+  } else if (review) {
+    actions.push(review);
+  }
   actions.push({ href: "/accueil", label: t("Terminer") });
+
+  const verdict =
+    kind === "notion"
+      ? passed
+        ? { ok: true, title: t("Notion validée"), text: t("Tu as obtenu au moins {percent} %. Tu peux passer à la suite.", { percent: PASS_PERCENT }) }
+        : {
+            ok: false,
+            title: t("Notion pas encore validée"),
+            text: t("Il faut au moins {percent} % pour valider une notion. Relis-la, puis réessaie.", { percent: PASS_PERCENT }),
+          }
+      : kind === "general"
+        ? passed
+          ? { ok: true, title: t("Cours validé"), text: t("Bravo : tu maîtrises ce cours.") }
+          : {
+              ok: false,
+              title: t("Cours pas encore validé"),
+              text: t("Il faut au moins {percent} % pour valider le cours. Revois les notions ratées, puis refais le quiz.", { percent: PASS_PERCENT }),
+            }
+        : null;
+  const advice = wrong.filter((answer) => answer.advice).slice(0, 3);
 
   return (
     <Screen>
@@ -74,6 +116,16 @@ function Resultat() {
             </p>
           </div>
         </section>
+
+        {verdict ? (
+          <section
+            role="status"
+            className={`flex flex-col gap-0.5 rounded-[14px] px-3.5 py-3 ${verdict.ok ? "bg-pale text-pale2" : "bg-danger-bg text-danger"}`}
+          >
+            <h3 className="text-[15px] font-bold">{verdict.title}</h3>
+            <p className="text-sm leading-snug">{verdict.text}</p>
+          </section>
+        ) : null}
 
         <h2 className="font-display text-lg font-bold">{t("Tes réponses")}</h2>
         <ul className="flex flex-col gap-2">
@@ -101,7 +153,22 @@ function Resultat() {
           ))}
         </ul>
 
-        {first ? (
+        {advice.length > 0 ? (
+          <section className="flex flex-col gap-2.5 rounded-[14px] border border-line bg-card p-3.5">
+            <h3 className="font-display text-lg font-bold">{t("Un conseil")}</h3>
+            <ul className="flex flex-col gap-3">
+              {advice.map((answer) => (
+                <li key={answer.questionId} className="flex flex-col gap-1">
+                  <p className="text-[15px] font-semibold">{answer.notionTitle}</p>
+                  <p className="text-sm leading-relaxed">{answer.advice}</p>
+                  <div>
+                    <SourceChip source={answer.source} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : first ? (
           <section className="flex flex-col gap-1.5 rounded-[14px] bg-pale px-3.5 py-3 text-pale2">
             <p className="text-[15px] leading-snug">
               {t("À revoir :")} <b>{first.notionTitle}</b>
